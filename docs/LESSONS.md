@@ -376,3 +376,68 @@ adb -s <watch> shell settings put system screen_off_timeout 600000   # 10 min
 Also: batching `input swipe; input swipe; input tap` in one shell call fires
 them faster than Compose can settle, and the taps land on the wrong page. Put a
 real pause between UI events.
+
+---
+
+## 21 — Health Services' status constants are @RestrictTo(LIBRARY)
+*2026-09-09 · build*
+
+**Symptom:** ten lint `RestrictedApi` errors, e.g.
+`Companion.OWNED_EXERCISE_IN_PROGRESS can only be accessed from within the same
+library (androidx.health:health-services-client)`.
+
+**Cause:** in 1.1.0-rc02 the *Kotlin companion objects* of
+`ExerciseTrackedStatus` and `ExerciseEndReason` carry
+`@RestrictTo(Scope.LIBRARY)`, even though the values are plain
+`public static final int` on the interfaces and Google's own documentation uses
+them by name. Reading `exerciseTrackedStatus` and comparing it is the only way
+to use the API. A packaging bug, not a real boundary.
+
+**Fix:** `@SuppressLint("RestrictedApi")` on the two members that compare them,
+with the reason inline. Do not disable the check project-wide — it is a useful
+rule everywhere else.
+
+---
+
+## 22 — Git Bash rewrites device paths in adb arguments
+*2026-09-09 · tooling*
+
+**Symptom:** `adb pull /sdcard/w1.png dest.png` failed with
+`failed to stat remote object 'C:/Program Files/Git/sdcard/w1.png'` — even
+though `adb shell ls /sdcard/w1.png` showed the file.
+
+**Cause:** MSYS path conversion rewrites any argument that looks like a Unix
+absolute path into a Windows path. It applies to the *device* path, which is not
+a host path at all. Paths inside a quoted `adb shell "..."` survive, which makes
+it look inconsistent.
+
+**Fix:** `export MSYS_NO_PATHCONV=1` before adb commands that take device paths
+(or write `//sdcard/...`).
+
+---
+
+## 23 — Driving Wear UI over adb needs one shell call, not many
+*2026-09-09 · tooling*
+
+Three things fight you when automating a real watch:
+
+1. **Doze.** The screen sleeps in ~30 s and the watch returns to its face, so
+   later taps land on the watch face — one launched the weather app mid-test.
+   `settings put system screen_off_timeout` is **not** honoured on Wear;
+   `svc power stayon true` only helps while charging.
+2. **Samsung Freecess** freezes the app process between commands
+   (`FZ : com.gymwatch, reason: LEV`).
+3. **Notifications steal focus.** A Google survey card appeared over the app and
+   silently ate several swipes.
+
+**What works:** put wake, launch, navigation, tap and `screencap` into a *single*
+`adb shell "...; sleep 1; ..."` so the whole interaction happens inside one wake
+window, then pull the PNG afterwards.
+
+**Better still:** `MainActivity` now accepts `--ei page N` to open straight to a
+screen, which removed three fragile swipes from every test. That is not test-only
+scaffolding — the Ongoing Activity indicator and the tile both need it, so it
+earns its place in the app.
+
+**Also:** a black 1975-byte screencap means the screen is off (lesson 20); a real
+one here is 10–70 KB.

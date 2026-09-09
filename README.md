@@ -15,8 +15,8 @@ a different health backend — are new adapters, not a rewrite of the core.
 | 1 · Skeleton, version catalog, guardrails | done |
 | 2 · Domain and use cases, pure JVM | done — 57 tests green |
 | 3 · Compose UI, persistence, foreground service | **done — verified on a real Galaxy Watch 8** |
-| 4 · Workouts via Health Services | next |
-| 5 · Tile *(optional)* | |
+| 4 · Workouts via Health Services | **done — live HR on device** |
+| 5 · Tile *(optional)* | next |
 | 6 · WFF watch face *(optional)* | |
 
 ## Quick start

@@ -19,6 +19,7 @@ internal object GymColors {
     val Rest = Color(0xFFFAC775)
     val Danger = Color(0xFFF09595)
     val Go = Color(0xFF97C459)
+    val StopBackground = Color(0xFF4A1B1B)
 }
 
 @Composable

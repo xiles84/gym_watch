@@ -131,3 +131,40 @@ adb connect 192.168.15.140:40647
 
 The pairing port and the connect port are **different** — confirmed here:
 pairing `35649`, connect `40647`.
+
+## Phase 4 verified on device — 2026-09-09
+
+| Check | Result |
+|---|---|
+| Permission prompt appears on first workout | pass — `GrantPermissionsActivity`, "access your physical activity" |
+| API-36 permission path is the live one | pass — `health.READ_HEART_RATE`, not `BODY_SENSORS` |
+| Weights workout starts via Health Services | pass |
+| Live metrics | pass — **0:51 elapsed, 72 bpm** from the sensor |
+| Foreground service switches type for a workout | pass — `types=0x00000100` (HEALTH), was `0x40000000` (SPECIAL_USE) |
+| Ending returns to the pager, service stops | pass — `Exercise ended: ENDED reason=4` (USER_END), 0 service records |
+
+Granting the permissions for testing (reversible):
+
+```bash
+adb -s <watch> shell pm grant com.gymwatch android.permission.ACTIVITY_RECOGNITION
+adb -s <watch> shell pm grant com.gymwatch android.permission.health.READ_HEART_RATE
+# undo:
+adb -s <watch> shell pm revoke com.gymwatch android.permission.health.READ_HEART_RATE
+```
+
+Open the app straight on a page (0 chrono, 1 rest, 2 counter, 3 workouts):
+
+```bash
+adb -s <watch> shell am start -n com.gymwatch/.MainActivity --ei page 3
+```
+
+### Still not verified
+
+- **Does the workout appear in Samsung Health?** Health Services recorded it, but
+  where it surfaces is undocumented. Check Samsung Health on the phone for a
+  Weights session around the test time and write the answer into LESSONS.md.
+- **The conflict guard against a real Samsung Health workout.** The code path is
+  unit-tested, but taking the slot from Samsung Health for real has not been
+  tried. Start a workout in Samsung Health, then start one here: it must ask.
+- Rotary bezel, haptics, the rest-timer buzz, and the watch-face indicator —
+  all need a human wearing the watch.
