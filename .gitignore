@@ -1,8 +1,16 @@
 .gradle/
 build/
-local.properties
-*.apk
-*.aab
 .idea/
 *.iml
 .kotlin/
+*.apk
+*.aab
+
+# Secrets and machine-local config — never commit these.
+# local.properties holds the SDK path AND the release signing password;
+# the keystore is the signing identity itself. Anyone with both can publish
+# an app that Android accepts as this one. See docs/RELEASING.md.
+local.properties
+keystore.properties
+*.jks
+*.keystore
