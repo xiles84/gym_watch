@@ -1,0 +1,58 @@
+package com.gymwatch.core.domain.model
+
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+
+class RestTimerTest {
+
+    @Test
+    fun `idle timer reports its full duration`() {
+        val timer = RestTimer(duration = 90.seconds)
+        assertEquals(90.seconds, timer.remainingAt(5.minutes))
+        assertFalse(timer.isRunning)
+    }
+
+    @Test
+    fun `remaining counts down from the start mark`() {
+        val timer = RestTimer(duration = 90.seconds).start(now = 10.seconds)
+        assertEquals(60.seconds, timer.remainingAt(40.seconds))
+    }
+
+    @Test
+    fun `remaining clamps at zero and never goes negative`() {
+        val timer = RestTimer(duration = 30.seconds).start(0.seconds)
+        assertEquals(Duration.ZERO, timer.remainingAt(45.seconds))
+        assertTrue(timer.hasExpiredAt(45.seconds))
+    }
+
+    @Test
+    fun `an idle timer has not expired even at a large clock value`() {
+        assertFalse(RestTimer(duration = 30.seconds).hasExpiredAt(9.minutes))
+    }
+
+    @Test
+    fun `progress runs from one down to zero`() {
+        val timer = RestTimer(duration = 60.seconds).start(0.seconds)
+        assertEquals(1f, timer.progressAt(0.seconds))
+        assertEquals(0.5f, timer.progressAt(30.seconds))
+        assertEquals(0f, timer.progressAt(60.seconds))
+    }
+
+    @Test
+    fun `duration is clamped to the allowed range`() {
+        assertEquals(RestTimer.MIN, RestTimer().withDuration(1.seconds).duration)
+        assertEquals(RestTimer.MAX, RestTimer().withDuration(2.minutes * 60).duration)
+    }
+
+    @Test
+    fun `adjusting duration cancels any run in progress`() {
+        val adjusted = RestTimer(duration = 60.seconds).start(0.seconds).adjustBy(15.seconds)
+        assertEquals(75.seconds, adjusted.duration)
+        assertFalse(adjusted.isRunning)
+    }
+}
