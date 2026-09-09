@@ -2,28 +2,32 @@
 
 Everything here assumes `source scripts/env.sh` has been run first.
 
-## Ground truth (fill in on first connect)
+## Ground truth (verified 2026-09-09)
 
 | | |
 |---|---|
-| Watch model | _not yet recorded_ |
-| `ro.build.version.sdk` | _not yet recorded_ |
-| `ro.build.version.release` | _not yet recorded_ |
-| Samsung Health (watch) version | _not yet recorded_ |
-| First paired | _not yet_ |
+| Watch model | **SM-L705F** (Galaxy Watch 8 Classic) |
+| `ro.build.version.release` | **16** — Wear OS 6 |
+| `ro.build.version.sdk` | **36** |
+| ABI | **armeabi-v7a** (32-bit ARM) |
+| Samsung Health (watch) | **7.00.0.131** (targetSdk 37) |
+| adb address | `192.168.15.140`, connect port `40647` |
+| adb serial | `adb-RXGL40B4V8M-O5Py0F` |
 
-Record them with:
+So `targetSdk = 36`. `compileSdk` stays **37** because `android-37.0` is the only
+platform installed — compiling ahead of the target is fine, targeting ahead of
+a device you cannot test is not.
+
+The API-36 split in `AndroidPermissions` is therefore the *live* path on this
+watch: heart rate is `android.permission.health.READ_HEART_RATE`, not
+`BODY_SENSORS`.
+
+**A phone is often connected too** (SM-S918B, `192.168.15.122`). With two
+devices attached, every adb command needs `-s`:
 
 ```bash
-adb shell getprop ro.product.model
-adb shell getprop ro.build.version.sdk
-adb shell getprop ro.build.version.release
-adb shell dumpsys package com.samsung.android.wear.shealth | grep versionName
+adb -s 192.168.15.140:40647 shell ...
 ```
-
-`compileSdk`/`targetSdk` in `gradle/libs.versions.toml` are currently **37**,
-because `android-37.0` is the only platform installed. If the watch reports a
-lower level, only `targetSdk` needs to change — `compileSdk` may stay ahead.
 
 ## Pairing over Wi-Fi (Galaxy Watch has no USB port)
 
@@ -98,3 +102,32 @@ These are the ones that catch real regressions; automated tests cannot.
 6. **Where does the record land?** After a Health Services workout, check both
    Health Connect and the Samsung Health app. Write the answer into
    `docs/LESSONS.md` — this is a known open question.
+
+## Verified on device — 2026-09-09
+
+| Check | Result |
+|---|---|
+| App launches, all 4 screens render | pass |
+| Chronometer counts | pass — 0:06 after 6 s |
+| **Chronometer survives doze** | **pass — 0:06 → 1:32 across 60 s screen-off** (`mWakefulness=Dozing`) |
+| Counter persists across force-stop | pass — 12 before, 12 after |
+| Rest timer counts down with ring | pass — 1:30 → 1:25 |
+| Foreground service starts | pass — `types=0x40000000` (SPECIAL_USE) |
+| Fatal exceptions in session | 0 |
+
+Not yet verified: rotary bezel stepping, haptics, the rest-timer buzz at zero,
+and the Ongoing Activity indicator on the watch face. All four need a human
+wearing the watch — adb cannot feel a vibration or turn a bezel.
+
+## Pairing, as actually done
+
+mDNS discovery removes the need to read the IP off the watch:
+
+```bash
+adb mdns services      # shows _adb-tls-pairing._tcp while "Pair new device" is open
+adb pair 192.168.15.140:<pairing-port> <6-digit-code>
+adb connect 192.168.15.140:40647
+```
+
+The pairing port and the connect port are **different** — confirmed here:
+pairing `35649`, connect `40647`.

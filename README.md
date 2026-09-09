@@ -11,11 +11,11 @@ a different health backend — are new adapters, not a rewrite of the core.
 
 | Phase | |
 |---|---|
-| 0 · Toolchain and device ground truth | done (watch not yet paired) |
+| 0 · Toolchain and device ground truth | done — SM-L705F, Wear OS 6, API 36 |
 | 1 · Skeleton, version catalog, guardrails | done |
 | 2 · Domain and use cases, pure JVM | done — 57 tests green |
-| 3 · Compose UI, persistence, foreground service | next |
-| 4 · Workouts via Health Services | |
+| 3 · Compose UI, persistence, foreground service | **done — verified on a real Galaxy Watch 8** |
+| 4 · Workouts via Health Services | next |
 | 5 · Tile *(optional)* | |
 | 6 · WFF watch face *(optional)* | |
 
@@ -27,6 +27,12 @@ source scripts/env.sh
 ```
 
 No emulator or watch needed — the core is pure Kotlin JVM.
+
+Build the watch APK:
+
+```bash
+./gradlew :app:assembleDebug
+```
 
 ## Where things are
 

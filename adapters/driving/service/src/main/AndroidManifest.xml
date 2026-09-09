@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Timers run as specialUse; only a real workout uses the health type,
+         which additionally requires a granted runtime permission. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
+    <!-- Required alongside FOREGROUND_SERVICE_HEALTH for the health service type.
+         Declaring it is necessary but NOT sufficient: it must also be granted at
+         runtime before startForeground(TYPE_HEALTH). See docs/LESSONS.md #19. -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+
+    <application>
+        <service
+            android:name=".GymSessionService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse|health">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps a gym rest timer and chronometer running while the screen is off" />
+        </service>
+    </application>
+</manifest>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!--
+      Lint claims mipmap-anydpi-v26 is redundant because minSdk is 33. It is
+      wrong: AAPT2 does not resolve an adaptive-icon XML placed in a plain
+      mipmap-anydpi folder, and following the advice fails the build with
+      "resource mipmap/ic_launcher not found". Scoped to this folder only, so
+      the rule still catches genuine dead SDK_INT branches in code.
+    -->
+    <issue id="ObsoleteSdkInt">
+        <ignore path="src/main/res/mipmap-anydpi-v26" />
+    </issue>
+</lint>
