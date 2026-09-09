@@ -206,3 +206,238 @@ the other when reporting what caught a regression.
 The other rules are not redundant — `no wall clock`, `ports are interfaces`,
 and `no adapter imports` are all things the compiler will happily allow. Two of
 them fired during initial development, which is how they earned their place.
+
+---
+
+## 13 — AGP 9 has built-in Kotlin; applying the Kotlin Android plugin is an error
+*2026-09-09 · build*
+
+**Symptom:** every Android module failed at configuration with
+`The 'org.jetbrains.kotlin.android' plugin is no longer required for Kotlin
+support since AGP 9.0.`
+
+**Fix:** Android modules declare only `com.android.library` /
+`com.android.application`. Kotlin comes from AGP. The Compose compiler plugin
+(`org.jetbrains.kotlin.plugin.compose`) is still applied separately.
+
+`:core:domain` and `:core:application` are unaffected — they use
+`org.jetbrains.kotlin.jvm`, which is a different plugin and still required.
+
+**Also:** `android { kotlinOptions { jvmTarget = ... } }` does **not** exist in
+AGP 9's new DSL — that block is gone, not merely deprecated. Setting
+`compileOptions` source/target to 17 is enough; AGP aligns the Kotlin target
+itself. Do not reintroduce a `kotlinOptions` or `kotlin { compilerOptions }`
+block in an Android module.
+
+---
+
+## 14 — local.properties needs forward slashes on Windows
+*2026-09-09 · build*
+
+**Symptom:** `Could not determine the dependencies of task
+':...:extractDebugAnnotations'. java.io.IOException: Invalid file path`, thrown
+from `SdkLocator.validateSdkPath`.
+
+**Cause:** `local.properties` is a Java `.properties` file, where a single
+backslash is an escape character. `sdk.dir=C:\Users\xiles\...` parsed as
+`C:Usersxiles...` and failed validation. The error names an annotation task, not
+the SDK path, which sends you looking in the wrong place.
+
+**Fix:** `sdk.dir=C:/Users/xiles/AppData/Local/Android/Sdk`. Forward slashes
+work on Windows and sidestep escaping entirely.
+
+---
+
+## 15 — AGP and Gradle versions are tightly coupled; check the pair
+*2026-09-09 · build*
+
+AGP **9.4.0** requires Gradle **9.6.0** minimum — not the 9.1.0 that the AGP
+9.0.0 release notes quote, and not the 9.5.0 that happened to be in the wrapper
+cache. The failure is explicit and tells you the exact version to use, so read
+it rather than downgrading AGP by guesswork.
+
+Current pinned pair: **AGP 9.4.0 + Gradle 9.6.0**, on JDK 25 (Android Studio's
+JBR), `compileSdk`/`targetSdk` 37, `minSdk` 33.
+
+---
+
+## 16 — Lint's ObsoleteSdkInt advice on the launcher icon breaks the build
+*2026-09-09 · build*
+
+**Symptom:** lint warned that `res/mipmap-anydpi-v26` is unnecessary because
+minSdk is 33 and said to merge it into `mipmap-anydpi`. Doing so failed the
+build with `AAPT: error: resource mipmap/ic_launcher not found` — on *release*
+resource processing as well as debug, so it was not a stale-cache artifact
+(verified with a clean build).
+
+**Cause:** AAPT2 does not resolve an `adaptive-icon` XML from a plain
+`mipmap-anydpi` folder. The `-v26` qualifier is required regardless of minSdk.
+
+**Fix:** keep `mipmap-anydpi-v26`, and suppress the rule *only for that path* in
+`app/lint.xml`. Do not disable `ObsoleteSdkInt` project-wide — it correctly
+caught a dead `SDK_INT >= S` branch in `AndroidHaptics` in the same run.
+
+**Avoid it by:** treating lint suggestions as hypotheses. Build after taking one.
+
+---
+
+## 17 — FLAG_ACTIVITY_NEW_TASK / CLEAR_TOP break Recents on Wear OS
+*2026-09-09 · correctness*
+
+Lint's `WearRecents` check flagged both places we built an Intent for a
+`PendingIntent`. On Wear these flags interfere with the Recents behaviour that
+the Ongoing Activity indicator depends on — and a `PendingIntent.getActivity`
+target does not need them in the first place.
+
+**Fix:** removed the flags. Only add `NEW_TASK` when actually calling
+`startActivity` from a non-Activity context.
+
+---
+
+## 18 — Declare a permission in the module that uses it
+*2026-09-09 · build*
+
+**Symptom:** `:adapters:driven:platform:lintDebug` failed with
+`Missing permissions required by Vibrator.vibrate: android.permission.VIBRATE`,
+even though `:app` declared it.
+
+**Cause:** lint analyses each module in isolation. A library that calls a
+permission-guarded API must declare the permission in its own manifest;
+manifest merging still carries it up to the app.
+
+**Fix:** `VIBRATE` and `POST_NOTIFICATIONS` moved into the platform adapter's
+manifest, `foregroundServiceType="health"` lives in the service adapter's. The
+app manifest keeps only what the app itself needs. This is better design anyway
+— a module that cannot forget its own requirements.
+
+**Related:** the persistence module keeps `gymDataStore` and the three
+`DataStore*` classes `internal`, exposing only a `PersistenceAdapters` factory
+that returns ports. The composition root never learns DataStore exists, so
+swapping storage is genuinely a one-module change. The compiler enforced this
+by rejecting the first attempt at wiring it.
+
+---
+
+## 19 — FGS type "health" needs a *granted* runtime permission, and a timer must not use it
+*2026-09-09 · correctness · found on device*
+
+**Symptom:** first launch on the watch looked fine, but tapping start on the
+chronometer crashed the app straight back to the watch face, and
+`dumpsys activity services` showed `Restarting ServiceRecord`.
+
+**Cause:**
+
+```
+java.lang.SecurityException: Starting FGS with type health targetSDK=36
+  requires permissions: allOf=[FOREGROUND_SERVICE_HEALTH]
+  anyOf=[ACTIVITY_RECOGNITION, HIGH_SAMPLING_RATE_SENSORS,
+         health.READ_HEART_RATE, health.READ_SKIN_TEMPERATURE,
+         health.READ_OXYGEN_SATURATION]
+```
+
+Declaring the permissions in the manifest is **not** enough — one of the `anyOf`
+set must be *granted at runtime* before `startForeground(..., TYPE_HEALTH)`. We
+had granted nothing yet.
+
+The deeper mistake was design, not configuration: a chronometer and a rest timer
+have nothing to do with health, so hard-coding `health` coupled every timer to
+permissions it does not need.
+
+**Fix:** the service takes the type per session — `SPECIAL_USE` for timers
+(with the required `PROPERTY_SPECIAL_USE_FGS_SUBTYPE` property in the manifest),
+`HEALTH` only while a Health Services exercise runs, in phase 4, after
+permissions are granted. Verified on device: `types=0x40000000` is
+`FOREGROUND_SERVICE_TYPE_SPECIAL_USE`.
+
+**And:** `startForeground` is now wrapped in try/catch. If the platform refuses,
+the service stops itself and the app carries on — the timers are clock-derived
+and keep perfect time regardless; only the notification is lost. Never let a
+notification failure take down the app.
+
+---
+
+## 20 — A black screencap usually means the display slept, not a render failure
+*2026-09-09 · tooling*
+
+`adb exec-out screencap -p` returns an all-black PNG (~2 KB for 480x480) when
+the watch display is off. The watch's default `screen_off_timeout` is **30 s**,
+so this happens constantly while testing.
+
+Check `adb shell dumpsys power | grep mWakefulness` — `Dozing` means the screen,
+not your UI, is the problem. A real capture of these screens is ~10 KB.
+
+While testing:
+
+```bash
+adb -s <watch> shell settings put system screen_off_timeout 600000   # 10 min
+# ... and put it back to 30000 when done
+```
+
+Also: batching `input swipe; input swipe; input tap` in one shell call fires
+them faster than Compose can settle, and the taps land on the wrong page. Put a
+real pause between UI events.
+
+---
+
+## 21 — Health Services' status constants are @RestrictTo(LIBRARY)
+*2026-09-09 · build*
+
+**Symptom:** ten lint `RestrictedApi` errors, e.g.
+`Companion.OWNED_EXERCISE_IN_PROGRESS can only be accessed from within the same
+library (androidx.health:health-services-client)`.
+
+**Cause:** in 1.1.0-rc02 the *Kotlin companion objects* of
+`ExerciseTrackedStatus` and `ExerciseEndReason` carry
+`@RestrictTo(Scope.LIBRARY)`, even though the values are plain
+`public static final int` on the interfaces and Google's own documentation uses
+them by name. Reading `exerciseTrackedStatus` and comparing it is the only way
+to use the API. A packaging bug, not a real boundary.
+
+**Fix:** `@SuppressLint("RestrictedApi")` on the two members that compare them,
+with the reason inline. Do not disable the check project-wide — it is a useful
+rule everywhere else.
+
+---
+
+## 22 — Git Bash rewrites device paths in adb arguments
+*2026-09-09 · tooling*
+
+**Symptom:** `adb pull /sdcard/w1.png dest.png` failed with
+`failed to stat remote object 'C:/Program Files/Git/sdcard/w1.png'` — even
+though `adb shell ls /sdcard/w1.png` showed the file.
+
+**Cause:** MSYS path conversion rewrites any argument that looks like a Unix
+absolute path into a Windows path. It applies to the *device* path, which is not
+a host path at all. Paths inside a quoted `adb shell "..."` survive, which makes
+it look inconsistent.
+
+**Fix:** `export MSYS_NO_PATHCONV=1` before adb commands that take device paths
+(or write `//sdcard/...`).
+
+---
+
+## 23 — Driving Wear UI over adb needs one shell call, not many
+*2026-09-09 · tooling*
+
+Three things fight you when automating a real watch:
+
+1. **Doze.** The screen sleeps in ~30 s and the watch returns to its face, so
+   later taps land on the watch face — one launched the weather app mid-test.
+   `settings put system screen_off_timeout` is **not** honoured on Wear;
+   `svc power stayon true` only helps while charging.
+2. **Samsung Freecess** freezes the app process between commands
+   (`FZ : com.gymwatch, reason: LEV`).
+3. **Notifications steal focus.** A Google survey card appeared over the app and
+   silently ate several swipes.
+
+**What works:** put wake, launch, navigation, tap and `screencap` into a *single*
+`adb shell "...; sleep 1; ..."` so the whole interaction happens inside one wake
+window, then pull the PNG afterwards.
+
+**Better still:** `MainActivity` now accepts `--ei page N` to open straight to a
+screen, which removed three fragile swipes from every test. That is not test-only
+scaffolding — the Ongoing Activity indicator and the tile both need it, so it
+earns its place in the app.
+
+**Also:** a black 1975-byte screencap means the screen is off (lesson 20); a real
+one here is 10–70 KB.

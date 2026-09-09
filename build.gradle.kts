@@ -1,9 +1,7 @@
-// Root build file. Deliberately thin.
-//
-// Only the plugins the *current* phase needs are declared here. Android plugins
-// get added in phase 3 — keeping them out means `:core` builds and tests run
-// with no Android toolchain involved at all, which is the point of the
-// hexagonal split (see docs/ARCHITECTURE.md).
+// Root build file. Deliberately thin — every module declares what it needs.
 plugins {
     alias(libs.plugins.kotlin.jvm) apply false
+    alias(libs.plugins.kotlin.compose) apply false
+    alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.android.library) apply false
 }
