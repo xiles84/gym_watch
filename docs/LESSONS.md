@@ -608,3 +608,37 @@ cause from a Compose-side one without rebuilding.
 **Avoid it by:** declaring `singleTop` on any Activity a deep link can reach
 while it is running, and confirming `onNewIntent` with a log line or an
 on-screen change — never with `am start`'s console message.
+
+---
+
+## 29 — CRLF and LF files live side by side here; a rewrite flips every line
+*2026-09-10 · tooling*
+
+**Symptom:** a four-line manifest change committed as a 106-line diff, and a
+64-line lesson correction as 1116 lines. `git diff --ignore-cr-at-eol --stat`
+showed the real change.
+
+**Cause:** there is no `.gitattributes`, and `core.autocrlf=true` comes from Git
+for Windows' system gitconfig. The tree is split — 42 files are stored with
+CRLF, 48 with LF, and this file itself was CRLF up to #24 and LF after. Git
+leaves CRs alone on `git add` when the stored copy already has them, so the
+line endings a tool writes are the ones that get committed. `perl -pi`, or any
+tool that rewrites a whole file as LF, flips every line of a CRLF file.
+
+Two things hid it:
+
+- Git Bash's `grep` and `sed` strip CRs before printing, so
+  `grep ... | od -c` shows bare `\n` on a CRLF file. Count bytes instead:
+  `perl -ne '$c++ if /\r/; END{print $c+0}' file`.
+- A perl regex spelled with literal `\n` silently fails to match a CRLF file,
+  which looks like a typo in the pattern.
+
+**Fix:** rebuild the commit with each file's original endings — write the
+exact bytes with `git hash-object -w --no-filters`, stage them into a temporary
+index (`GIT_INDEX_FILE`, `git update-index --cacheinfo`), `git commit-tree`.
+
+**Avoid it by:** `git ls-files --eol <path>` before editing a file, and before
+any commit comparing `git diff --cached --stat` with
+`git diff --cached --ignore-cr-at-eol --stat`. If they differ, fix the endings
+first. A `.gitattributes` would end this for good, but it means a repo-wide
+renormalising commit — its own change, not a side effect of another.
