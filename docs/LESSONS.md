@@ -564,27 +564,47 @@ the device, and reaching for the Wear component before the generic Compose one.
 
 ---
 
-## 26 — An Activity that is already running does not re-read its intent
-*2026-09-09 · correctness · found on device*
+## 26 — A running Activity only sees a new intent if it is `singleTop`
+*2026-09-09 · correctness · found on device · corrected 2026-09-10*
 
-**Symptom:** `am start ... --es screen REST_TIMER` printed
+**Symptom:** with the app already open,
+`am start -n com.gymwatch/.MainActivity --es screen REST_TIMER` printed
 `Activity not started, intent has been delivered to currently running top-most
-instance` and the app stayed exactly where it was.
+instance` (result code 3) and the pager did not move. The same extra on a cold
+start worked. No exception, no crash, screenshots byte-identical.
 
-**Cause:** `MainActivity` read the extra in `onCreate`. Android delivers a new
-intent to the *live* Activity rather than recreating it, so the extra was only
-ever honoured on a cold start.
+**Cause:** `MainActivity` had the default `standard` launch mode. Relaunching a
+task's root Activity with an intent that `filterEquals` the original — and
+extras are *not* part of that comparison — only brings the task forward.
+`ActivityStarter.complyActivityFlags` hands the intent to the live instance only
+when the launch is single-top (`FLAG_ACTIVITY_SINGLE_TOP` or
+`launchMode="singleTop"`). So `onNewIntent` never ran.
 
-This is not a test-harness detail: the Ongoing Activity indicator on the watch
-face is a `PendingIntent` into this same Activity. Tapping it while the app was
-already open — the common case, since the indicator only exists *because*
-something of ours is running — went nowhere.
+The console message is the trap: `recycleTask` returns `START_DELIVERED_TO_TOP`
+whenever the task was already in front, whether or not anything was delivered.
+It is not evidence that `onNewIntent` fired.
 
-**Fix:** hold the requested screen in `mutableStateOf`, set it from both
-`onCreate` and `onNewIntent` (calling `setIntent`), and let a `LaunchedEffect`
-scroll the pager and clear it. Clearing matters: without it the effect will not
-re-fire for the same screen twice.
+The first version of this lesson blamed reading the extra only in `onCreate`,
+and fixed only that: the requested screen held in `mutableStateOf`, set from
+both `onCreate` and `onNewIntent` (calling `setIntent`), with a `LaunchedEffect`
+that scrolls the pager and then clears it. That half is still required —
+clearing is what lets the same screen be requested twice — but without
+single-top it was dead code.
 
-**Avoid it by:** treating `onCreate`-only intent reads as a bug whenever the
-Activity can be reached while already running — which is any launcher Activity
-with a notification or tile pointing at it.
+This is not a test-harness detail. The Ongoing Activity indicator and any tile
+are `PendingIntent`s into this same Activity, and they exist *because*
+something of ours is running, so the warm path is the common one. (Today the
+indicator's intent carries no screen extra and just brings the app forward.)
+
+**Fix:** `android:launchMode="singleTop"` on `MainActivity`, keeping the
+`onNewIntent` + `LaunchedEffect` path. It covers every caller — adb, the
+indicator, a future tile — without each one adding flags, and brings none of
+the `NEW_TASK`/`CLEAR_TOP` Recents trouble noted in `MainActivity`.
+
+On a build without the fix, `am start ... -f 0x20000000` (that is
+`FLAG_ACTIVITY_SINGLE_TOP`) forces the same delivery — a quick way to tell this
+cause from a Compose-side one without rebuilding.
+
+**Avoid it by:** declaring `singleTop` on any Activity a deep link can reach
+while it is running, and confirming `onNewIntent` with a log line or an
+on-screen change — never with `am start`'s console message.

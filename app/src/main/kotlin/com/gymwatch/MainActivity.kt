@@ -38,9 +38,11 @@ class MainActivity : ComponentActivity() {
     /**
      * The screen a caller asked for, held as state rather than read once.
      *
-     * Android delivers a new intent to the *running* Activity instead of
-     * recreating it, so reading this only in [onCreate] would make a tap on the
-     * watch-face indicator do nothing whenever the app was already open.
+     * A launch while the app is already open reaches the *running* Activity
+     * through [onNewIntent] instead of recreating it, so reading this only in
+     * [onCreate] would ignore every deep link but the first. That delivery only
+     * happens because the manifest declares the Activity `singleTop`
+     * (docs/LESSONS.md #26).
      */
     private var pendingScreen by mutableStateOf<AppScreen?>(null)
 

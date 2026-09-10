@@ -37,9 +37,13 @@
             android:name="com.google.android.wearable.standalone"
             android:value="true" />
 
+        <!-- singleTop, or a launch while the app is already open never reaches
+             onNewIntent: extras do not count when Android compares intents, so
+             it only brings the task forward (docs/LESSONS.md #26). -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:taskAffinity=""
             android:theme="@android:style/Theme.DeviceDefault">
             <intent-filter>
