@@ -23,7 +23,14 @@ data class Palette(
     val chrono: Long,
     val rest: Long,
     val go: Long,
-)
+) {
+    /**
+     * Every role drawn as text or a glyph straight onto the screen rather than
+     * only as a fill. Over a wallpaper these are what must stay readable, so
+     * they are what the wallpaper's dimming is solved against.
+     */
+    val textColors: List<Long> get() = listOf(onSurface, muted, dim, chrono, rest, go)
+}
 
 /**
  * The colour schemes the watch can be set to.
@@ -36,6 +43,11 @@ data class Palette(
  * power and gives the numbers maximum contrast, which is the whole reason the
  * original palette looked the way it did — a skin changes the accents, not
  * that decision.
+ *
+ * The themed skins lay a picture over that black and dim it with more black,
+ * so black is still what sits under every number, just not the whole screen.
+ * The pictures are Android resources and live in the UI adapter; what belongs
+ * here is the palette, light in every text role so it reads over dimmed art.
  */
 enum class Skin(val title: String, val palette: Palette) {
 
@@ -79,6 +91,51 @@ enum class Skin(val title: String, val palette: Palette) {
             chrono = 0xFF7CF5FFL,
             rest = 0xFFC77DFFL,
             go = 0xFF56E39FL,
+        ),
+    ),
+
+    /** Capsule Corp browns, dragon-ball orange and gold. */
+    DRAGON_BALL(
+        title = "Dragon Ball",
+        palette = Palette(
+            background = 0xFF000000L,
+            surface = 0xFF2B1E14L,
+            onSurface = 0xFFFFF6ECL,
+            muted = 0xFFEBDCCBL,
+            dim = 0xFFDDCDBBL,
+            chrono = 0xFFFFB547L,
+            rest = 0xFFFFD24DL,
+            go = 0xFF8FE06AL,
+        ),
+    ),
+
+    /** Night-sky violet, moon gold and a light pink. */
+    SAILOR_MOON(
+        title = "Sailor Moon",
+        palette = Palette(
+            background = 0xFF000000L,
+            surface = 0xFF231B3AL,
+            onSurface = 0xFFF5F2FFL,
+            muted = 0xFFD9D3F0L,
+            dim = 0xFFCFC9E6L,
+            chrono = 0xFFFFE08AL,
+            rest = 0xFFFFB8D6L,
+            go = 0xFF9EE6B8L,
+        ),
+    ),
+
+    /** Anya pink, Yor's gold hairpin, a muted sage. */
+    SPY_FAMILY(
+        title = "Spy × Family",
+        palette = Palette(
+            background = 0xFF000000L,
+            surface = 0xFF2A2326L,
+            onSurface = 0xFFFAF6F1L,
+            muted = 0xFFE3D9CFL,
+            dim = 0xFFD6CCC2L,
+            chrono = 0xFFF4B6C8L,
+            rest = 0xFFE9C46AL,
+            go = 0xFFA8D5A2L,
         ),
     );
 

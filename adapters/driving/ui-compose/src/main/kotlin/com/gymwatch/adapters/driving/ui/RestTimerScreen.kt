@@ -2,6 +2,7 @@ package com.gymwatch.adapters.driving.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -79,6 +80,14 @@ fun RestTimerScreen(
     }
 
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Backdrop(
+            when {
+                alarming -> WallpaperSlot.REST_OVER
+                counting -> WallpaperSlot.REST_RUNNING
+                else -> WallpaperSlot.REST
+            },
+        )
+
         when {
             alarming -> RestAlarm(
                 onRestart = { useCase.requestRestart() },
@@ -225,6 +234,18 @@ private fun RestRing(progress: Float) {
         val stroke = 8f
         val inset = stroke / 2
         val arcSize = Size(size.width - stroke, size.height - stroke)
+        // A band twice the track's width under it, in the background black. On
+        // a plain skin it vanishes; over a wallpaper it is what the ring stands
+        // out against, instead of whatever the picture has at the rim.
+        drawArc(
+            color = palette.background,
+            startAngle = -90f,
+            sweepAngle = 360f,
+            useCenter = false,
+            topLeft = Offset(inset, inset),
+            size = arcSize,
+            style = Stroke(width = stroke * 2),
+        )
         drawArc(
             color = palette.surface,
             startAngle = -90f,
@@ -260,6 +281,7 @@ private fun PresetButton(
         modifier = Modifier
             .size(52.dp)
             .background(GymColors.Surface, CircleShape)
+            .border(1.dp, GymColors.Outline, CircleShape)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
         contentAlignment = Alignment.Center,
     ) {

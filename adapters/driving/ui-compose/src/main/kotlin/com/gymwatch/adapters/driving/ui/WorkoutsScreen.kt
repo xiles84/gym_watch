@@ -1,6 +1,7 @@
 package com.gymwatch.adapters.driving.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -92,6 +93,7 @@ private fun Shortcut(
             modifier = Modifier
                 .size(54.dp)
                 .background(GymColors.Surface, CircleShape)
+                .border(1.dp, GymColors.Outline, CircleShape)
                 .combinedClickable(onClick = onClick, onLongClick = onLongClick),
             contentAlignment = Alignment.Center,
         ) {

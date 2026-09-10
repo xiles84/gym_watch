@@ -496,7 +496,14 @@ scaffolding — the Ongoing Activity indicator and the tile both need it, so it
 earns its place in the app.
 
 **Also:** a black 1975-byte screencap means the screen is off (lesson 20); a real
-one here is 10–70 KB.
+one here is 10–70 KB, and 110–290 KB over a themed skin's wallpaper.
+
+**And wait after waking (found 2026-09-10).** A gesture sent straight after
+`input keyevent KEYCODE_WAKEUP` is dropped while the screen and the frozen
+process come back, and nothing reports it. In one run a skin tap was lost, and
+every screenshot after it showed the *previous* step's screen — so the whole
+run looked plausible frame by frame. Wake, `sleep 2`, then act. Identical byte
+counts for screenshots of different screens mean the UI did not move.
 
 ---
 
@@ -753,3 +760,42 @@ any commit comparing `git diff --cached --stat` with
 `git diff --cached --ignore-cr-at-eol --stat`. If they differ, fix the endings
 first. A `.gitattributes` would end this for good, but it means a repo-wide
 renormalising commit — its own change, not a side effect of another.
+
+---
+
+## 30 — Dimming a wallpaper: model sRGB blending, and find the art by rays
+*2026-09-10 · ui · tooling*
+
+The themed skins put a picture behind every screen and a black overlay on it,
+solved per picture so the dimmest text role reaches 4.5:1. Four things took a
+second attempt.
+
+**The overlay estimate was wrong in linear light.** Scaling luminance by
+`(1 − a)` said a pale picture needs ~84% black under `#E8E8E8` text. Compose
+(Skia) blends in the *encoded* sRGB space: each 8-bit channel becomes
+`c · (1 − a)`, and only then is it linearised. Modelled that way the same
+pictures need 60–64%, and the art stays visible. `ScrimSolver` and
+`WallpaperContrastTest` both blend in sRGB. Do not "correct" them to linear.
+
+**`·` came out as `Â·` from `scripts/wallpapers.ps1`.** The file was UTF-8
+without a BOM, and Windows PowerShell 5.1 (`powershell -File`) decodes a
+BOM-less script as the ANSI code page. Nothing errors; only the drawn text is
+wrong. Fixed by saving with a BOM. A tool that rewrites the whole file can drop
+it again — `Format-Hex scripts/wallpapers.ps1 -Count 3` must show `EF BB BF`.
+
+**The art circle was found too early, then in the wrong place.** Every source is
+painted as a watch: margin, near-black bezel, art. Scanning the centre row for
+"the last dark pixel" stopped on Sailor Moon's glossy bezel highlight, and a
+centre-row scan also runs into dark art that touches the rim (Yor's hair, Luna).
+What works: 48 rays inward; on a light margin, trust nothing as art until the
+dark ring has been crossed (the painted drop shadow is neither margin nor ring);
+require 10 px of art so a highlight does not count; fit a circle, drop points
+that fall inside it, fit again.
+
+**`System.Drawing` will not mix rectangle types.** `DrawImage(img, Rectangle,
+RectangleF, unit)` fails overload resolution in PowerShell with a conversion
+error that looks like a value problem. Use `RectangleF` for both.
+
+**Avoid it by:** checking any "how much to dim" number against the way the GPU
+blends rather than against the luminance formula, and saving any `.ps1` that
+contains non-ASCII text with a BOM.

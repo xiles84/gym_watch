@@ -1,7 +1,6 @@
 package com.gymwatch.adapters.driving.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gymwatch.core.application.ChronometerUseCase
@@ -89,67 +89,98 @@ fun GymApp(
     GymTheme(skin) {
         Box(Modifier.fillMaxSize().background(GymColors.Background)) {
             when (val editor = editing) {
-                is Editor.Preset -> RestPresetEditor(
-                    title = "rest",
-                    initial = setup.restPresets[editor.index],
-                    onConfirm = { duration ->
-                        workouts.setRestPreset(editor.index, duration)
-                        editing = null
-                    },
-                )
+                is Editor.Preset -> {
+                    Backdrop(WallpaperSlot.REST_EDITOR)
+                    RestPresetEditor(
+                        title = "rest",
+                        initial = setup.restPresets[editor.index],
+                        onConfirm = { duration ->
+                            workouts.setRestPreset(editor.index, duration)
+                            editing = null
+                        },
+                    )
+                }
 
-                is Editor.Shortcut -> WorkoutPicker(
-                    selected = setup.shortcutAt(editor.index),
-                    icons = workoutIcons,
-                    onPick = { kind ->
-                        workouts.setShortcut(editor.index, kind)
-                        editing = null
-                    },
-                )
+                is Editor.Shortcut -> {
+                    Backdrop(WallpaperSlot.WORKOUT_PICKER)
+                    WorkoutPicker(
+                        selected = setup.shortcutAt(editor.index),
+                        icons = workoutIcons,
+                        onPick = { kind ->
+                            workouts.setShortcut(editor.index, kind)
+                            editing = null
+                        },
+                    )
+                }
 
                 null -> {
                     HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-                        when (visible.getOrNull(page)) {
-                            AppScreen.CHRONOMETER -> ChronometerScreen(chronometer)
+                        val screen = visible.getOrNull(page)
 
-                            AppScreen.REST_TIMER -> RestTimerScreen(
-                                useCase = restTimer,
-                                onEditPreset = { editing = Editor.Preset(it) },
-                            )
+                        Box(Modifier.fillMaxSize()) {
+                            // The rest timer draws its own: only it knows whether
+                            // it is counting down or ringing.
+                            if (screen != AppScreen.REST_TIMER) Backdrop(wallpaperSlotOf(screen))
 
-                            AppScreen.COUNTER -> CounterScreen(counter)
+                            when (screen) {
+                                AppScreen.CHRONOMETER -> ChronometerScreen(chronometer)
 
-                            AppScreen.WORKOUTS -> WorkoutsScreen(
-                                useCase = workouts,
-                                icons = workoutIcons,
-                                onChangeShortcut = { editing = Editor.Shortcut(it) },
-                            )
+                                AppScreen.REST_TIMER -> RestTimerScreen(
+                                    useCase = restTimer,
+                                    onEditPreset = { editing = Editor.Preset(it) },
+                                )
 
-                            // Past the last visible screen: the settings page.
-                            null -> SettingsScreen(screenLayout, skins)
+                                AppScreen.COUNTER -> CounterScreen(counter)
+
+                                AppScreen.WORKOUTS -> WorkoutsScreen(
+                                    useCase = workouts,
+                                    icons = workoutIcons,
+                                    onChangeShortcut = { editing = Editor.Shortcut(it) },
+                                )
+
+                                // Past the last visible screen: the settings page.
+                                null -> SettingsScreen(screenLayout, skins)
+                            }
                         }
                     }
 
                     Row(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
-                            .padding(bottom = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            .padding(bottom = 6.dp),
                     ) {
                         repeat(pageCount) { index ->
+                            // Each dot sits on a dark disc: invisible on black,
+                            // and what keeps it visible on a bright patch of art.
                             Box(
                                 Modifier
-                                    .size(5.dp)
-                                    .background(
-                                        if (index == pagerState.currentPage) GymColors.OnSurface
-                                        else GymColors.Dim,
-                                        CircleShape,
-                                    ),
-                            )
+                                    .size(9.dp)
+                                    .background(Color.Black.copy(alpha = 0.7f), CircleShape),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Box(
+                                    Modifier
+                                        .size(5.dp)
+                                        .background(
+                                            if (index == pagerState.currentPage) GymColors.OnSurface
+                                            else GymColors.Dim,
+                                            CircleShape,
+                                        ),
+                                )
+                            }
                         }
                     }
                 }
             }
         }
     }
+}
+
+/** The picture behind a pager page; `null` is the settings page after the last screen. */
+private fun wallpaperSlotOf(screen: AppScreen?): WallpaperSlot = when (screen) {
+    AppScreen.CHRONOMETER -> WallpaperSlot.CHRONO
+    AppScreen.REST_TIMER -> WallpaperSlot.REST
+    AppScreen.COUNTER -> WallpaperSlot.COUNTER
+    AppScreen.WORKOUTS -> WallpaperSlot.WORKOUTS
+    null -> WallpaperSlot.SETTINGS
 }

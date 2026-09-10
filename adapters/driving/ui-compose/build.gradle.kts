@@ -28,4 +28,8 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.compose.ui.tooling.preview)
     debugImplementation(libs.androidx.compose.ui.tooling)
+
+    // Pure JVM: WallpaperContrastTest reads the shipped JPEGs with ImageIO and
+    // never touches Android.
+    testImplementation(libs.junit)
 }

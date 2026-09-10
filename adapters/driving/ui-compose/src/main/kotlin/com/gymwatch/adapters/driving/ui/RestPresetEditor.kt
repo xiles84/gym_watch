@@ -86,7 +86,7 @@ fun RestPresetEditor(
                 state = minuteState,
                 contentDescription = { "${minuteState.selectedOptionIndex} minutes" },
                 modifier = Modifier.width(50.dp),
-                gradientColor = GymColors.Background,
+                gradientColor = GymColors.PickerFade,
             ) { optionIndex ->
                 PickerOption(
                     text = optionIndex.toString(),
@@ -100,7 +100,7 @@ fun RestPresetEditor(
                 state = secondState,
                 contentDescription = { "${secondState.selectedOptionIndex * SECOND_STEP} seconds" },
                 modifier = Modifier.width(50.dp),
-                gradientColor = GymColors.Background,
+                gradientColor = GymColors.PickerFade,
             ) { optionIndex ->
                 PickerOption(
                     text = "%02d".format(optionIndex * SECOND_STEP),

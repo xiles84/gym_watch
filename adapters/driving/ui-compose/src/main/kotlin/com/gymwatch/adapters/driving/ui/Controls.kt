@@ -1,6 +1,7 @@
 package com.gymwatch.adapters.driving.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,6 +23,9 @@ import androidx.wear.compose.material3.Text
  *
  * Sized for a gloved, sweaty thumb rather than for density: 48dp is the smallest
  * target that is reliably hittable without looking at the watch.
+ *
+ * The outline only shows over a wallpaper ([GymColors.Outline]), where a dark
+ * button on dimmed art would otherwise lose its edge.
  */
 @Composable
 internal fun RoundButton(
@@ -37,6 +41,7 @@ internal fun RoundButton(
         modifier = modifier
             .size(size.dp)
             .background(background, CircleShape)
+            .border(1.dp, GymColors.Outline, CircleShape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {

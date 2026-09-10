@@ -32,7 +32,7 @@ the JVM with no emulator, no device, and no Robolectric.
 
 | Module | Type | Contains |
 |---|---|---|
-| `:core:domain` | kotlin-jvm | `Chronometer`, `RestTimer`, `RestPresets`, `Counter`, `WorkoutSetup`, `ScreenLayout`, `Skin`/`Palette`, `ExerciseKind`, `ResetOutcome`; all port interfaces |
+| `:core:domain` | kotlin-jvm | `Chronometer`, `RestTimer`, `RestPresets`, `Counter`, `WorkoutSetup`, `ScreenLayout`, `Skin`/`Palette`, `Contrast`, `ExerciseKind`, `ResetOutcome`; all port interfaces |
 | `:core:application` | kotlin-jvm | `ChronometerUseCase`, `RestTimerUseCase`, `CounterUseCase`, `WorkoutSetupUseCase`, `ScreenLayoutUseCase`, `SkinUseCase` |
 | `:adapters:driven:persistence` | android-lib | DataStore implementations of the repository ports |
 | `:adapters:driven:platform` | android-lib | `ClockPort`, `HapticsPort`, `OngoingActivityPort`, `CompanionHealthAppPort`; `SamsungHealthIcons` |
@@ -65,6 +65,15 @@ Exercise icons are not a port. They are pure presentation, so the UI module
 declares a `WorkoutIcons` function interface and the composition root hands it
 `SamsungHealthIcons::bitmap` — the driving adapter never depends on the driven
 one, and the core never hears about icons at all.
+
+Skin wallpapers split the same way. A skin's palette is domain (`Skin`), and so
+is `Contrast`, the WCAG arithmetic that says whether a palette reads. The
+pictures are Android resources, so the UI module maps a skin to them
+(`artFor`), and `ScrimSolver` works out from each picture how much black to lay
+over it. `WallpaperContrastTest` runs that solver over the shipped JPEGs on the
+JVM. The sources are in `skin-images/<theme>/<slot>.png`, where the file name
+is the assignment, and `scripts/wallpapers.ps1` crops them into resources
+(`docs/LESSONS.md` #30).
 
 ## The one design decision everything else rests on
 

@@ -4,6 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
+import androidx.wear.compose.material3.LocalTextStyle
 import com.gymwatch.core.domain.model.Palette
 import com.gymwatch.core.domain.model.Skin
 
@@ -12,7 +14,8 @@ import com.gymwatch.core.domain.model.Skin
  *
  * The domain holds ARGB longs because it cannot see `androidx`; this is the one
  * place they become `Color`, and it happens once per skin change rather than
- * once per draw.
+ * once per draw. [textColors] stays ARGB: it only ever feeds [ScrimSolver],
+ * which is plain Kotlin.
  */
 internal data class GymPalette(
     val background: Color,
@@ -23,6 +26,7 @@ internal data class GymPalette(
     val chrono: Color,
     val rest: Color,
     val go: Color,
+    val textColors: List<Long>,
 )
 
 private fun Palette.toCompose() = GymPalette(
@@ -34,6 +38,7 @@ private fun Palette.toCompose() = GymPalette(
     chrono = Color(chrono),
     rest = Color(rest),
     go = Color(go),
+    textColors = textColors,
 )
 
 /**
@@ -42,6 +47,9 @@ private fun Palette.toCompose() = GymPalette(
  * than tracking every reader.
  */
 internal val LocalPalette = staticCompositionLocalOf { Skin.DEFAULT.palette.toCompose() }
+
+/** The current skin's pictures, or `null` for a plain skin. Static for the same reason. */
+internal val LocalSkinArt = staticCompositionLocalOf<SkinArt?> { null }
 
 /**
  * Reads the current skin's colours.
@@ -61,8 +69,41 @@ internal object GymColors {
     val Chrono: Color @Composable get() = LocalPalette.current.chrono
     val Rest: Color @Composable get() = LocalPalette.current.rest
     val Go: Color @Composable get() = LocalPalette.current.go
+
+    /**
+     * A hairline round a tap target, so a dark button keeps its edge against
+     * dimmed art. Transparent on a plain skin, where the black around a button
+     * already outlines it.
+     */
+    val Outline: Color @Composable get() =
+        if (LocalSkinArt.current == null) Color.Transparent else LocalPalette.current.onSurface.copy(alpha = 0.45f)
+
+    /**
+     * What a `Picker` fades its outer options into. The screen's black on a
+     * plain skin; nothing over a wallpaper, where a black fade drew two dark
+     * bars straight across the picture.
+     */
+    val PickerFade: Color @Composable get() =
+        if (LocalSkinArt.current == null) LocalPalette.current.background else Color.Transparent
 }
 
+/**
+ * Over a wallpaper, every piece of text also gets a soft black shadow. The
+ * scrim is solved against the 99th-percentile pixel, so the brightest one
+ * percent — a star, the shine on a dragon ball — can still sit under a letter;
+ * the shadow keeps that letter's edge. Provided through [LocalTextStyle] so
+ * none of the `Text` calls change.
+ */
 @Composable
-internal fun GymTheme(skin: Skin, content: @Composable () -> Unit) =
-    CompositionLocalProvider(LocalPalette provides skin.palette.toCompose(), content = content)
+internal fun GymTheme(skin: Skin, content: @Composable () -> Unit) {
+    val art = artFor(skin)
+    val textStyle = LocalTextStyle.current
+    CompositionLocalProvider(
+        LocalPalette provides skin.palette.toCompose(),
+        LocalSkinArt provides art,
+        LocalTextStyle provides if (art == null) textStyle else textStyle.copy(shadow = ArtTextShadow),
+        content = content,
+    )
+}
+
+private val ArtTextShadow = Shadow(color = Color.Black.copy(alpha = 0.8f), blurRadius = 8f)

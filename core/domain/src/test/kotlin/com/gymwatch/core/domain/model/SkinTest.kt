@@ -59,4 +59,19 @@ class SkinTest {
         assertEquals(Skin.entries.size, Skin.entries.map { it.title }.distinct().size)
         assertTrue(Skin.entries.all { it.title.isNotBlank() })
     }
+
+    @Test
+    fun `every button glyph reads on its fill`() {
+        // RoundButton draws onSurface on surface; ▶, ✓, the alarm's ■ and the
+        // picked workout draw background on go or rest. Text over a wallpaper is
+        // checked against the pictures themselves, in WallpaperContrastTest.
+        Skin.entries.forEach { skin ->
+            with(skin.palette) {
+                listOf(onSurface to surface, background to go, background to rest).forEach { (glyph, fill) ->
+                    val ratio = Contrast.ratio(glyph, fill)
+                    assertTrue(ratio >= Contrast.MIN_TEXT, "${skin.name}: %.2f:1 is below AA".format(ratio))
+                }
+            }
+        }
+    }
 }
