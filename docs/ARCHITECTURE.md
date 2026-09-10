@@ -73,7 +73,8 @@ pictures are Android resources, so the UI module maps a skin to them
 over it. `WallpaperContrastTest` runs that solver over the shipped JPEGs on the
 JVM. The sources are in `skin-images/<theme>/<slot>.png`, where the file name
 is the assignment, and `scripts/wallpapers.ps1` crops them into resources
-(`docs/LESSONS.md` #30).
+(`docs/LESSONS.md` #30). The prompts that generated them, and the steps from a
+generated image to a skin, are in `docs/design/themed-skins/README.md`.
 
 ## The one design decision everything else rests on
 

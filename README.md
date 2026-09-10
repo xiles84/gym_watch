@@ -53,6 +53,8 @@ Build the watch APK:
 - **`docs/LESSONS.md`** — every non-obvious thing already learned, with reasons.
 - **`docs/ARCHITECTURE.md`** — the hexagon, ports, and why the core is JVM-only.
 - **`docs/DEVICE-RUNBOOK.md`** — pairing the watch over Wi-Fi, installing, logs.
+- **`docs/design/themed-skins/README.md`** — the prompts that generated the skin
+  wallpapers, and how a picture becomes part of a skin.
 
 ## Why an app and not a watch face
 

@@ -14,6 +14,9 @@
     text drawn on, to judge an assignment before any code uses it. The dimming
     there is a preview; the app's ScrimSolver and its test are authoritative.
 
+    The pictures come from the image-generation prompts in
+    docs/design/themed-skins/README.md, which also lists the slot file names.
+
     System.Drawing rather than Python or ImageMagick: neither is installed on
     this machine, and System.Drawing ships with Windows.
 
