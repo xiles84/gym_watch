@@ -7,12 +7,14 @@ import com.gymwatch.adapters.driven.platform.AndroidClock
 import com.gymwatch.adapters.driven.platform.AndroidHaptics
 import com.gymwatch.adapters.driven.platform.GymNotifications
 import com.gymwatch.adapters.driven.platform.OngoingActivityAdapter
+import com.gymwatch.adapters.driven.platform.SamsungHealthIcons
 import com.gymwatch.adapters.driven.platform.SamsungHealthLauncher
 import com.gymwatch.core.application.ChronometerUseCase
 import com.gymwatch.core.application.CounterUseCase
-import com.gymwatch.core.application.ProfilesUseCase
 import com.gymwatch.core.application.RestTimerUseCase
 import com.gymwatch.core.application.ScreenLayoutUseCase
+import com.gymwatch.core.application.SkinUseCase
+import com.gymwatch.core.application.WorkoutSetupUseCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 
@@ -46,22 +48,25 @@ class AppContainer(private val context: Context) {
 
     private val persistence = PersistenceAdapters(context)
 
-    /** Samsung Health owns the workout record; we only open it (LESSONS.md #2). */
+    /** Samsung Health owns the workout record; we open it on the exercise (LESSONS.md #2, #28). */
     private val healthApp = SamsungHealthLauncher(context)
+
+    /** Samsung Health's own icons, read from it at runtime and never bundled. */
+    val workoutIcons = SamsungHealthIcons(context)
 
     val chronometer = ChronometerUseCase(AndroidClock, haptics)
 
     val restTimer = RestTimerUseCase(
         clock = AndroidClock,
-        profiles = persistence.profiles,
+        setup = persistence.workoutSetup,
         haptics = haptics,
         scope = scope,
     )
 
     val counter = CounterUseCase(persistence.counters, haptics, scope)
 
-    val profiles = ProfilesUseCase(
-        repository = persistence.profiles,
+    val workouts = WorkoutSetupUseCase(
+        repository = persistence.workoutSetup,
         healthApp = healthApp,
         haptics = haptics,
         scope = scope,
@@ -69,6 +74,12 @@ class AppContainer(private val context: Context) {
 
     val screenLayout = ScreenLayoutUseCase(
         repository = persistence.screenLayout,
+        haptics = haptics,
+        scope = scope,
+    )
+
+    val skins = SkinUseCase(
+        repository = persistence.skins,
         haptics = haptics,
         scope = scope,
     )

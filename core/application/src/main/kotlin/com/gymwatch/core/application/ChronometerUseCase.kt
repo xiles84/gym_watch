@@ -1,8 +1,9 @@
 package com.gymwatch.core.application
 
 import com.gymwatch.core.domain.model.Chronometer
-import com.gymwatch.core.domain.port.ClockPort
 import com.gymwatch.core.domain.model.Haptic
+import com.gymwatch.core.domain.model.ResetOutcome
+import com.gymwatch.core.domain.port.ClockPort
 import com.gymwatch.core.domain.port.HapticsPort
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -33,7 +34,19 @@ class ChronometerUseCase(
         if (_state.value.laps.size != before.laps.size) haptics.play(Haptic.TICK)
     }
 
-    fun reset() {
+    /**
+     * Resets at once when paused or idle. A running chronometer is a set being
+     * timed, so it asks first and changes nothing — not even a buzz, since
+     * nothing has happened yet.
+     */
+    fun requestReset(): ResetOutcome {
+        if (_state.value.needsResetConfirmation) return ResetOutcome.NEEDS_CONFIRMATION
+        confirmReset()
+        return ResetOutcome.DONE
+    }
+
+    /** Unconditional: the user has already said yes, or there was nothing to ask. */
+    fun confirmReset() {
         _state.update { it.reset() }
         haptics.play(Haptic.CONFIRM)
     }

@@ -11,7 +11,19 @@ enum class AppScreen(val title: String) {
     CHRONOMETER("Chrono"),
     REST_TIMER("Rest"),
     COUNTER("Counter"),
-    PROFILES("Profiles"),
+    WORKOUTS("Workouts");
+
+    companion object {
+        /**
+         * Screens are stored and requested by name. `PROFILES` is what the
+         * workouts screen was called while profiles existed, and a stored layout
+         * that still says so must keep its place rather than be appended last.
+         */
+        fun of(name: String?): AppScreen? =
+            if (name == LEGACY_WORKOUTS) WORKOUTS else entries.firstOrNull { it.name == name }
+
+        private const val LEGACY_WORKOUTS = "PROFILES"
+    }
 }
 
 /**

@@ -48,24 +48,3 @@ internal fun RoundButton(
         )
     }
 }
-
-/** Full-width pill, used for the workout list. */
-@Composable
-internal fun PillButton(
-    label: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    background: Color = GymColors.Surface,
-    contentColor: Color = GymColors.OnSurface,
-) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(background, RoundedCornerShape(percent = 50))
-            .clickable(onClick = onClick)
-            .padding(vertical = 10.dp, horizontal = 14.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(text = label, color = contentColor, fontSize = 14.sp, textAlign = TextAlign.Center)
-    }
-}

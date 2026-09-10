@@ -1,15 +1,18 @@
 package com.gymwatch.core.application.fake
 
 import com.gymwatch.core.domain.model.Counter
+import com.gymwatch.core.domain.model.ExerciseKind
 import com.gymwatch.core.domain.model.Haptic
-import com.gymwatch.core.domain.model.Profiles
 import com.gymwatch.core.domain.model.ScreenLayout
+import com.gymwatch.core.domain.model.Skin
+import com.gymwatch.core.domain.model.WorkoutSetup
 import com.gymwatch.core.domain.port.ClockPort
 import com.gymwatch.core.domain.port.CompanionHealthAppPort
 import com.gymwatch.core.domain.port.CounterRepositoryPort
 import com.gymwatch.core.domain.port.HapticsPort
-import com.gymwatch.core.domain.port.ProfilesRepositoryPort
 import com.gymwatch.core.domain.port.ScreenLayoutRepositoryPort
+import com.gymwatch.core.domain.port.SkinRepositoryPort
+import com.gymwatch.core.domain.port.WorkoutSetupRepositoryPort
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -43,16 +46,16 @@ class InMemoryCounterRepository(initial: Counter = Counter()) : CounterRepositor
     override suspend fun save(counter: Counter) { flow.value = counter }
 }
 
-class InMemoryProfilesRepository(
-    initial: Profiles = Profiles.DEFAULT,
-) : ProfilesRepositoryPort {
+class InMemoryWorkoutSetupRepository(
+    initial: WorkoutSetup = WorkoutSetup.DEFAULT,
+) : WorkoutSetupRepositoryPort {
     private val flow = MutableStateFlow(initial)
-    override val profiles: StateFlow<Profiles> = flow.asStateFlow()
-    var saved: Profiles? = null
+    override val setup: StateFlow<WorkoutSetup> = flow.asStateFlow()
+    var saved: WorkoutSetup? = null
         private set
-    override suspend fun save(profiles: Profiles) {
-        saved = profiles
-        flow.value = profiles
+    override suspend fun save(setup: WorkoutSetup) {
+        saved = setup
+        flow.value = setup
     }
 }
 
@@ -69,11 +72,18 @@ class InMemoryScreenLayoutRepository(
     }
 }
 
+/**
+ * @param available whether the health app is installed at all.
+ * @param startSucceeds whether the direct route into an exercise still works —
+ *   false models an app update that removed it.
+ */
 class FakeHealthApp(
     private val available: Boolean = true,
+    private val startSucceeds: Boolean = true,
 ) : CompanionHealthAppPort {
     var openCount = 0
         private set
+    val started = mutableListOf<ExerciseKind>()
 
     override suspend fun isAvailable(): Boolean = available
 
@@ -81,5 +91,24 @@ class FakeHealthApp(
         if (!available) return false
         openCount++
         return true
+    }
+
+    override suspend fun startWorkout(kind: ExerciseKind): Boolean {
+        if (!available) return false
+        started += kind
+        return startSucceeds
+    }
+}
+
+class InMemorySkinRepository(
+    initial: Skin = Skin.DEFAULT,
+) : SkinRepositoryPort {
+    private val flow = MutableStateFlow(initial)
+    override val skin: StateFlow<Skin> = flow.asStateFlow()
+    var saved: Skin? = null
+        private set
+    override suspend fun save(skin: Skin) {
+        saved = skin
+        flow.value = skin
     }
 }

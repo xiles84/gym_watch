@@ -35,8 +35,8 @@ internal class DataStoreScreenLayoutRepository(
         }
     }
 
-    private fun decode(name: String): AppScreen? =
-        AppScreen.entries.firstOrNull { it.name == name }
+    /** Through [AppScreen.of], so a layout stored with `PROFILES` keeps its place. */
+    private fun decode(name: String): AppScreen? = AppScreen.of(name)
 
     private companion object {
         val ORDER = stringPreferencesKey("screen_order")

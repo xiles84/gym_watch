@@ -19,4 +19,7 @@ dependencies {
     api(project(":core:domain"))
     implementation(libs.androidx.wear.ongoing)
     implementation(libs.androidx.core.ktx)
+
+    // Pure JVM: SamsungExercisesTest checks names, it never touches Android.
+    testImplementation(libs.junit)
 }

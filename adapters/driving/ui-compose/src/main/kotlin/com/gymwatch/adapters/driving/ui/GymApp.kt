@@ -22,15 +22,16 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gymwatch.core.application.ChronometerUseCase
 import com.gymwatch.core.application.CounterUseCase
-import com.gymwatch.core.application.ProfilesUseCase
 import com.gymwatch.core.application.RestTimerUseCase
 import com.gymwatch.core.application.ScreenLayoutUseCase
+import com.gymwatch.core.application.SkinUseCase
+import com.gymwatch.core.application.WorkoutSetupUseCase
 import com.gymwatch.core.domain.model.AppScreen
 
 /** Which editor, if any, is covering the pager. */
 private sealed interface Editor {
     data class Preset(val index: Int) : Editor
-    data class Profile(val index: Int) : Editor
+    data class Shortcut(val index: Int) : Editor
 }
 
 /**
@@ -47,13 +48,16 @@ fun GymApp(
     chronometer: ChronometerUseCase,
     restTimer: RestTimerUseCase,
     counter: CounterUseCase,
-    profiles: ProfilesUseCase,
+    workouts: WorkoutSetupUseCase,
+    workoutIcons: WorkoutIcons,
     screenLayout: ScreenLayoutUseCase,
+    skins: SkinUseCase,
     requestedScreen: AppScreen? = null,
     onScreenHandled: () -> Unit = {},
 ) {
     val layout by screenLayout.state.collectAsStateWithLifecycle()
-    val profilesState by profiles.state.collectAsStateWithLifecycle()
+    val setup by workouts.state.collectAsStateWithLifecycle()
+    val skin by skins.state.collectAsStateWithLifecycle()
 
     val visible = layout.visible
     // Settings is appended rather than being an AppScreen, so it can never be
@@ -82,26 +86,23 @@ fun GymApp(
         onScreenHandled()
     }
 
-    GymTheme {
+    GymTheme(skin) {
         Box(Modifier.fillMaxSize().background(GymColors.Background)) {
             when (val editor = editing) {
                 is Editor.Preset -> RestPresetEditor(
-                    title = profilesState.current.kind.displayName,
-                    initial = profilesState.current.restPresets[editor.index],
+                    title = "rest",
+                    initial = setup.restPresets[editor.index],
                     onConfirm = { duration ->
-                        profiles.setRestPreset(
-                            profileIndex = profilesState.selected,
-                            presetIndex = editor.index,
-                            duration = duration,
-                        )
+                        workouts.setRestPreset(editor.index, duration)
                         editing = null
                     },
                 )
 
-                is Editor.Profile -> ProfileEditor(
-                    initial = profilesState.entries[editor.index],
-                    onConfirm = { profile ->
-                        profiles.setProfileAt(editor.index, profile)
+                is Editor.Shortcut -> WorkoutPicker(
+                    selected = setup.shortcutAt(editor.index),
+                    icons = workoutIcons,
+                    onPick = { kind ->
+                        workouts.setShortcut(editor.index, kind)
                         editing = null
                     },
                 )
@@ -116,18 +117,16 @@ fun GymApp(
                                 onEditPreset = { editing = Editor.Preset(it) },
                             )
 
-                            AppScreen.COUNTER -> CounterScreen(
-                                useCase = counter,
-                                label = profilesState.current.counterLabel.name,
-                            )
+                            AppScreen.COUNTER -> CounterScreen(counter)
 
-                            AppScreen.PROFILES -> ProfilesScreen(
-                                useCase = profiles,
-                                onEditProfile = { editing = Editor.Profile(it) },
+                            AppScreen.WORKOUTS -> WorkoutsScreen(
+                                useCase = workouts,
+                                icons = workoutIcons,
+                                onChangeShortcut = { editing = Editor.Shortcut(it) },
                             )
 
                             // Past the last visible screen: the settings page.
-                            null -> SettingsScreen(screenLayout)
+                            null -> SettingsScreen(screenLayout, skins)
                         }
                     }
 

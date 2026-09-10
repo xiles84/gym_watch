@@ -12,7 +12,7 @@ Everything here assumes `source scripts/env.sh` has been run first.
 | `ro.build.version.sdk` | **36** |
 | ABI | **armeabi-v7a** (32-bit ARM) |
 | Samsung Health (watch) | **7.00.0.131** (targetSdk 37) |
-| adb address | `192.168.15.140`, connect port `40647` |
+| adb address | `192.168.15.140`; the connect port **changes on every reconnect** — use `adb mdns services` |
 | adb serial | `adb-RXGL40B4V8M-O5Py0F` |
 
 So `targetSdk = 36`. `compileSdk` stays **37** because `android-37.0` is the only
@@ -37,7 +37,7 @@ permission is `POST_NOTIFICATIONS`.
 devices attached, every adb command needs `-s`:
 
 ```bash
-adb -s 192.168.15.140:40647 shell ...
+adb -s <watch> shell ...
 ```
 
 ## Pairing over Wi-Fi (Galaxy Watch has no USB port)
@@ -64,15 +64,29 @@ prompt on the watch face.
 
 ## Install and run
 
+The watch holds the **release** build. The debug APK is signed with a different
+key and will not install over it (`docs/LESSONS.md` #27). Never `adb uninstall`
+to get round that — it deletes the DataStore with every setting in it.
+
 ```bash
-./gradlew :app:assembleDebug
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+./gradlew build
+adb install -r app/build/outputs/apk/release/app-release.apk
 
 # Launch without touching the watch
 adb shell monkey -p com.gymwatch -c android.intent.category.LAUNCHER 1
 ```
 
-Uninstall: `adb uninstall com.gymwatch`
+Open the app straight on a screen — by **name**, not index, since screens can
+be reordered and hidden:
+
+```bash
+adb -s <watch> shell am start -n com.gymwatch/.MainActivity \
+  --es screen REST_TIMER
+```
+
+Valid names: `CHRONOMETER`, `REST_TIMER`, `COUNTER`, `WORKOUTS`. `PROFILES`, the
+old name, still lands on the workouts screen. An unknown or hidden one falls back
+to the first visible screen.
 
 ## Permissions
 
@@ -91,11 +105,24 @@ adb logcat -c                                              # clear first
 adb logcat -v time GymWatch:D AndroidRuntime:E '*:S'
 ```
 
-Health Services specifically:
+## Samsung Health shortcuts
+
+The workouts screen opens Samsung Health with an **undocumented** intent — the
+one its own watch-face complication sends (`docs/LESSONS.md` #28). If a Samsung
+Health update breaks it, a tap falls back to Samsung Health's home screen rather
+than doing nothing. Re-check it by hand after any Samsung Health update:
 
 ```bash
-adb logcat -v time | grep -iE 'healthservices|exerciseclient|whs'
+adb shell am start \
+  -a com.samsung.android.wear.shealth.intent.action.START_WORKOUT \
+  -n com.samsung.android.wear.shealth/.app.exercise.view.ExerciseActivity \
+  -f 0x10008000 --es exercise.type WEIGHT_MACHINE
 ```
+
+Expect Samsung Health's start screen for that exercise, play button showing.
+Nothing is recorded unless start is pressed. If the names changed, refresh the
+snapshot in `SamsungExercisesTest` from `aapt2 dump resources` and `dexdump`,
+as #28 describes.
 
 ## Manual checks that matter
 
@@ -108,12 +135,14 @@ These are the ones that catch real regressions; automated tests cannot.
    reopen. Must still read 12.
 3. **Counter does not lose data at launch.** Set it to 12, force-stop, reopen and
    press "+" immediately. Must read 13, not 1. See lesson 10.
-4. **Rotary bezel steps the counter.**
-5. **Workout conflict is surfaced.** Start a workout in Samsung Health, then try
-   to start one in this app. It must ask, not silently take over.
-6. **Where does the record land?** After a Health Services workout, check both
-   Health Connect and the Samsung Health app. Write the answer into
-   `docs/LESSONS.md` — this is a known open question.
+4. **Each shortcut opens its exercise.** Tap each circle on WORKOUTS; Samsung
+   Health must show that exercise's start screen, not its home screen.
+5. **Reset asks only while counting.** Running chronometer: ↺ shows the dialog,
+   ✕ keeps it running. Paused chronometer: ↺ resets with no dialog. Rest
+   countdown: ↺ shows the dialog; left open past zero, the dialog closes.
+6. **The rest alarm holds and repeats.** Needs someone wearing the watch: at zero
+   it stays on REST OVER and buzzes every 3 s — *including with the screen
+   covered* — until ↺, which needs no confirmation.
 
 ## Verified on device — 2026-09-09
 
@@ -127,9 +156,9 @@ These are the ones that catch real regressions; automated tests cannot.
 | Foreground service starts | pass — `types=0x40000000` (SPECIAL_USE) |
 | Fatal exceptions in session | 0 |
 
-Not yet verified: rotary bezel stepping, haptics, the rest-timer buzz at zero,
-and the Ongoing Activity indicator on the watch face. All four need a human
-wearing the watch — adb cannot feel a vibration or turn a bezel.
+Not yet verified: haptics, the rest-timer buzz at zero, and the Ongoing Activity
+indicator on the watch face. All need a human wearing the watch — adb cannot
+feel a vibration.
 
 ## Pairing, as actually done
 
@@ -138,11 +167,12 @@ mDNS discovery removes the need to read the IP off the watch:
 ```bash
 adb mdns services      # shows _adb-tls-pairing._tcp while "Pair new device" is open
 adb pair 192.168.15.140:<pairing-port> <6-digit-code>
-adb connect 192.168.15.140:40647
+adb connect 192.168.15.140:<connect-port>
 ```
 
-The pairing port and the connect port are **different** — confirmed here:
-pairing `35649`, connect `40647`.
+The pairing port and the connect port are **different**, and the connect port
+changes each time the watch reconnects: `40647`, then `46027`, then `36367` on
+2026-09-10 alone.
 
 ## Health Services — removed 2026-09-09
 
@@ -152,26 +182,15 @@ Phase 4 did work on device: a Weights exercise started, live heart rate arrived
 
 The open question in this section used to be *"does the workout appear in
 Samsung Health?"* The answer, from wearing it: **no, and it cannot.** Three
-independent blocks — see `docs/LESSONS.md` #2. Samsung Health now owns the
-workout record and the app just opens it.
+independent blocks — see `docs/LESSONS.md` #2. Samsung Health owns the workout
+record, and the app opens it on the exercise.
 
 So there are no health permissions to grant, no exercise slot to contend for,
 and `pm grant android.permission.health.READ_HEART_RATE` no longer applies.
 
-Open the app straight on a screen — by **name**, not index, since screens can
-now be reordered and hidden:
-
-```bash
-adb -s <watch> shell am start -n com.gymwatch/.MainActivity \
-  --es screen REST_TIMER
-```
-
-Valid names: `CHRONOMETER`, `REST_TIMER`, `COUNTER`, `PROFILES`. An unknown or
-hidden one falls back to the first visible screen.
-
 ### Still not verified
 
-- Haptics, the rest-timer buzz, and the watch-face indicator — all need a human
+- Haptics, the rest-timer alarm, and the watch-face indicator — all need a human
   wearing the watch.
 - Whether the **touch** bezel feeds `onRotaryScrollEvent` on this model. Nothing
   depends on it: the counter's rotary support is additive, and `Picker` handles

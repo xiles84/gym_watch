@@ -8,4 +8,10 @@
     -->
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Samsung Health is opened, resolved and read for icons from this module.
+         Package visibility has to be declared for any of that to see it. -->
+    <queries>
+        <package android:name="com.samsung.android.wear.shealth" />
+    </queries>
 </manifest>

@@ -2,8 +2,9 @@ package com.gymwatch.adapters.driven.persistence
 
 import android.content.Context
 import com.gymwatch.core.domain.port.CounterRepositoryPort
-import com.gymwatch.core.domain.port.ProfilesRepositoryPort
 import com.gymwatch.core.domain.port.ScreenLayoutRepositoryPort
+import com.gymwatch.core.domain.port.SkinRepositoryPort
+import com.gymwatch.core.domain.port.WorkoutSetupRepositoryPort
 
 /**
  * The persistence module's only public surface.
@@ -17,6 +18,7 @@ class PersistenceAdapters(context: Context) {
     private val store = context.applicationContext.gymDataStore
 
     val counters: CounterRepositoryPort = DataStoreCounterRepository(store)
-    val profiles: ProfilesRepositoryPort = DataStoreProfilesRepository(store)
+    val workoutSetup: WorkoutSetupRepositoryPort = DataStoreWorkoutSetupRepository(store)
     val screenLayout: ScreenLayoutRepositoryPort = DataStoreScreenLayoutRepository(store)
+    val skins: SkinRepositoryPort = DataStoreSkinRepository(store)
 }

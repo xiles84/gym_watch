@@ -62,14 +62,14 @@ class ScreenLayoutUseCaseTest {
     @Test
     fun `moving a screen reorders the pager`() = runTest {
         val f = Fixture()
-        f.useCase.move(AppScreen.PROFILES, -1)
+        f.useCase.move(AppScreen.WORKOUTS, -1)
         f.scope.runCurrent()
 
         assertEquals(
             listOf(
                 AppScreen.CHRONOMETER,
                 AppScreen.REST_TIMER,
-                AppScreen.PROFILES,
+                AppScreen.WORKOUTS,
                 AppScreen.COUNTER,
             ),
             requireNotNull(f.repository.saved).order,

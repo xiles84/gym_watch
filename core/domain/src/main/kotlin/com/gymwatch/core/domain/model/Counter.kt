@@ -1,12 +1,11 @@
 package com.gymwatch.core.domain.model
 
 /**
- * The set/rep counter. Floors at zero — a negative rep count is never what the
- * user meant, and silently clamping beats showing "-1" mid-workout.
+ * The set counter. Floors at zero — a negative count is never what the user
+ * meant, and silently clamping beats showing "-1" mid-workout.
  *
- * What it is *called* is not stored here: that comes from the active
- * [WorkoutProfile], so switching from weights to a run relabels it without
- * touching the count.
+ * One count, zeroed by hand when moving to the next machine. That is the whole
+ * workflow, which is why there is no count per exercise and no label to choose.
  */
 data class Counter(val value: Int = 0) {
 
