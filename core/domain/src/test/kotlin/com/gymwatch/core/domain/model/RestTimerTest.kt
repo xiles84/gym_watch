@@ -66,6 +66,23 @@ class RestTimerTest {
     }
 
     @Test
+    fun `restart runs the same length again from full`() {
+        val ringing = RestTimer(duration = 60.seconds).start(0.seconds)
+        val restarted = ringing.restart(now = 75.seconds)
+
+        assertEquals(60.seconds, restarted.duration)
+        assertEquals(60.seconds, restarted.remainingAt(75.seconds))
+        assertFalse(restarted.isAlarmingAt(75.seconds))
+        assertTrue(restarted.needsResetConfirmationAt(80.seconds))
+    }
+
+    @Test
+    fun `restarting an idle timer leaves it idle`() {
+        val idle = RestTimer(duration = 60.seconds)
+        assertEquals(idle, idle.restart(now = 10.seconds))
+    }
+
+    @Test
     fun `progress runs from one down to zero`() {
         val timer = RestTimer(duration = 60.seconds).start(0.seconds)
         assertEquals(1f, timer.progressAt(0.seconds))

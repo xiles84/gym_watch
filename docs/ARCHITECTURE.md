@@ -82,7 +82,7 @@ be killed, and doze can do whatever it likes. A tick loop would drift, stall, or
 need waking — and would be far harder to test.
 
 The rest alarm follows the same rule: the start mark is kept past zero until the
-user resets, so "is it ringing?" is also a question for the clock.
+user stops or restarts it, so "is it ringing?" is also a question for the clock.
 
 The same property makes the domain trivially testable: pass a `FakeClock`,
 advance it by 45 minutes instantly, assert. See `ChronometerTest`.

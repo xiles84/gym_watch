@@ -31,7 +31,11 @@ data class RestTimer(
      */
     fun isAlarmingAt(now: Duration): Boolean = hasExpiredAt(now)
 
-    /** Asks only mid-countdown. At zero, resetting is how the alarm is silenced. */
+    /**
+     * Asks only mid-countdown, for both stop and restart — either one throws the
+     * countdown away. At zero there is nothing left to lose, and either one is
+     * how the alarm is silenced.
+     */
     fun needsResetConfirmationAt(now: Duration): Boolean = isRunning && !hasExpiredAt(now)
 
     /** Fraction still to run, 1.0 down to 0.0 — for the progress ring. */
@@ -41,6 +45,13 @@ data class RestTimer(
 
     fun start(now: Duration): RestTimer = copy(startMark = now)
 
+    /**
+     * The same length again, from full. An idle timer has no length in play, so
+     * it stays idle — a restart that lands after a stop must not resurrect it.
+     */
+    fun restart(now: Duration): RestTimer = if (isRunning) start(now) else this
+
+    /** Back to idle: the countdown and any alarm are gone. */
     fun cancel(): RestTimer = copy(startMark = null)
 
     fun withDuration(new: Duration): RestTimer =

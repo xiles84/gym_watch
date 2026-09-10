@@ -41,9 +41,10 @@ import kotlin.time.Duration
  * rotating bezel, so the old "turn to set" interaction never worked here. Every
  * length is a target you can hit without looking (docs/LESSONS.md #24).
  *
- * ↺ asks before cancelling a countdown in progress. At zero it does not ask:
- * the alarm keeps buzzing until reset, and silencing it is the only thing left
- * to do. If zero arrives while the question is open, the question goes away.
+ * ↺ restarts the same length from full; ■ stops and goes back to the presets.
+ * Both ask before throwing away a countdown in progress. At zero neither asks:
+ * the alarm keeps buzzing until one of them is pressed. If zero arrives while
+ * the question is open, the question goes away.
  */
 @Composable
 fun RestTimerScreen(
@@ -61,23 +62,34 @@ fun RestTimerScreen(
     val alarming = useCase.isAlarmingNow()
     val counting = useCase.needsResetConfirmationNow()
 
-    var confirmingReset by remember { mutableStateOf(false) }
+    var confirming by remember { mutableStateOf(false) }
+    // Kept after the dialog closes so its title does not change mid-exit.
+    var question by remember { mutableStateOf(RestQuestion.STOP) }
     // Without this, a question left open when zero arrived would pop up again
     // the moment the next countdown started.
     LaunchedEffect(counting) {
-        if (!counting) confirmingReset = false
+        if (!counting) confirming = false
+    }
+
+    fun ask(outcome: ResetOutcome, about: RestQuestion) {
+        if (outcome == ResetOutcome.NEEDS_CONFIRMATION) {
+            question = about
+            confirming = true
+        }
     }
 
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         when {
-            alarming -> RestAlarm(onReset = { useCase.requestReset() })
+            alarming -> RestAlarm(
+                onRestart = { useCase.requestRestart() },
+                onStop = { useCase.requestStop() },
+            )
 
             counting -> RunningRest(
                 remainingLabel = useCase.remainingNow().asRestLabel(),
                 progress = useCase.progressNow(),
-                onReset = {
-                    if (useCase.requestReset() == ResetOutcome.NEEDS_CONFIRMATION) confirmingReset = true
-                },
+                onRestart = { ask(useCase.requestRestart(), RestQuestion.RESTART) },
+                onStop = { ask(useCase.requestStop(), RestQuestion.STOP) },
             )
 
             else -> Column(
@@ -108,22 +120,32 @@ fun RestTimerScreen(
     }
 
     ConfirmResetDialog(
-        visible = confirmingReset && counting,
-        title = "Reset rest?",
+        visible = confirming && counting,
+        title = question.title,
         detail = "${useCase.remainingNow().asRestLabel()} left",
         onConfirm = {
-            useCase.confirmReset()
-            confirmingReset = false
+            when (question) {
+                RestQuestion.RESTART -> useCase.confirmRestart()
+                RestQuestion.STOP -> useCase.confirmStop()
+            }
+            confirming = false
         },
-        onDismiss = { confirmingReset = false },
+        onDismiss = { confirming = false },
     )
+}
+
+/** Which of the two buttons the open question is about. */
+private enum class RestQuestion(val title: String) {
+    RESTART("Restart rest?"),
+    STOP("Stop rest?"),
 }
 
 @Composable
 private fun RunningRest(
     remainingLabel: String,
     progress: Float,
-    onReset: () -> Unit,
+    onRestart: () -> Unit,
+    onStop: () -> Unit,
 ) {
     RestRing(progress)
 
@@ -142,22 +164,21 @@ private fun RunningRest(
 
         Spacer(Modifier.height(10.dp))
 
-        RoundButton(
-            label = "↺",
-            onClick = onReset,
-            background = GymColors.Surface,
-            contentColor = GymColors.OnSurface,
-        )
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            RoundButton(label = "↺", onClick = onRestart)
+            RoundButton(label = "■", onClick = onStop, fontSize = 14)
+        }
     }
 }
 
 /**
  * Zero. Stays on screen and keeps buzzing — the use case repeats the haptic —
- * until reset, because one buzz is easy to miss. The button is bigger and in the
- * rest colour: it is the only thing on the screen worth pressing.
+ * until restarted or stopped, because one buzz is easy to miss. ■ is the bigger
+ * button and in the rest colour: silencing it is the usual answer. ↺ beside it
+ * goes straight into another rest of the same length.
  */
 @Composable
-private fun RestAlarm(onReset: () -> Unit) {
+private fun RestAlarm(onRestart: () -> Unit, onStop: () -> Unit) {
     RestRing(progress = 1f)
 
     Column(
@@ -174,17 +195,23 @@ private fun RestAlarm(onReset: () -> Unit) {
 
         Spacer(Modifier.height(8.dp))
 
-        RoundButton(
-            label = "↺",
-            onClick = onReset,
-            size = 56,
-            fontSize = 22,
-            background = GymColors.Rest,
-            contentColor = GymColors.Background,
-        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RoundButton(label = "↺", onClick = onRestart)
+            RoundButton(
+                label = "■",
+                onClick = onStop,
+                size = 56,
+                fontSize = 18,
+                background = GymColors.Rest,
+                contentColor = GymColors.Background,
+            )
+        }
 
         Spacer(Modifier.height(6.dp))
-        Text("tap to stop", color = GymColors.Dim, fontSize = 9.sp)
+        Text("↺ rest again · ■ stop", color = GymColors.Dim, fontSize = 9.sp)
     }
 }
 

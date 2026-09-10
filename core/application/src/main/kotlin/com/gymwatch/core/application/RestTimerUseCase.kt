@@ -28,8 +28,8 @@ import kotlin.time.Duration.Companion.seconds
  * that follows it.
  *
  * At zero the timer does not drop back to idle on its own. It rings —
- * [Haptic.REST_OVER] every [ALARM_REPEAT] — until reset, because one buzz is
- * easy to miss and the whole point is not to over-rest.
+ * [Haptic.REST_OVER] every [ALARM_REPEAT] — until stopped or restarted, because
+ * one buzz is easy to miss and the whole point is not to over-rest.
  *
  * The watchdog sleeps for exactly the remaining time and then re-checks against
  * the clock rather than counting down in fixed steps, so a long doze cannot make
@@ -48,9 +48,9 @@ class RestTimerUseCase(
     private val _alarming = MutableStateFlow(false)
 
     /**
-     * True from zero until reset. A flow of its own because reaching zero is not
-     * a change to [state] — the start mark stays put — and the watch-face
-     * indicator needs something to observe to say "Rest over".
+     * True from zero until stopped or restarted. A flow of its own because
+     * reaching zero is not a change to [state] — the start mark stays put — and
+     * the watch-face indicator needs something to observe to say "Rest over".
      */
     val alarming: StateFlow<Boolean> = _alarming.asStateFlow()
 
@@ -77,24 +77,39 @@ class RestTimerUseCase(
     }
 
     /**
-     * Resets at once unless a countdown is in progress, which asks first and
-     * changes nothing. Idle and ringing both reset straight away: there is
-     * nothing to lose, and at zero the reset is what silences the alarm.
+     * Stops at once unless a countdown is in progress, which asks first and
+     * changes nothing. Idle and ringing both stop straight away: there is
+     * nothing to lose, and at zero stopping is what silences the alarm.
      */
-    fun requestReset(): ResetOutcome {
-        if (_state.value.needsResetConfirmationAt(clock.elapsed())) {
-            return ResetOutcome.NEEDS_CONFIRMATION
-        }
-        confirmReset()
+    fun requestStop(): ResetOutcome {
+        if (needsResetConfirmationNow()) return ResetOutcome.NEEDS_CONFIRMATION
+        confirmStop()
         return ResetOutcome.DONE
     }
 
-    /** Unconditional. Stopping the watchdog is what stops the buzzing. */
-    fun confirmReset() {
+    /** Unconditional, back to idle. Stopping the watchdog is what stops the buzzing. */
+    fun confirmStop() {
         watchdog?.cancel()
         watchdog = null
         _alarming.value = false
         _state.update { it.cancel() }
+    }
+
+    /**
+     * The same length again, from full. Asks on the same terms as [requestStop]:
+     * mid-countdown it waits for confirmation, at zero it silences the alarm and
+     * starts the next rest at once.
+     */
+    fun requestRestart(): ResetOutcome {
+        if (needsResetConfirmationNow()) return ResetOutcome.NEEDS_CONFIRMATION
+        confirmRestart()
+        return ResetOutcome.DONE
+    }
+
+    /** Unconditional, but an idle timer stays idle — see [RestTimer.restart]. */
+    fun confirmRestart() {
+        val restarted = _state.value.restart(clock.elapsed())
+        if (restarted.isRunning) countDown(restarted)
     }
 
     fun remainingNow(): Duration = _state.value.remainingAt(clock.elapsed())
@@ -113,8 +128,13 @@ class RestTimerUseCase(
 
     private fun startFor(duration: Duration) {
         // withDuration clamps to RestTimer's own bounds and clears any old mark.
+        countDown(RestTimer().withDuration(duration).start(clock.elapsed()))
+    }
+
+    /** Replaces whatever was running, alarm included, and watches [timer] instead. */
+    private fun countDown(timer: RestTimer) {
         _alarming.value = false
-        _state.value = RestTimer().withDuration(duration).start(clock.elapsed())
+        _state.value = timer
         watchdog?.cancel()
         watchdog = scope.launch {
             while (isActive) {

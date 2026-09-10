@@ -139,10 +139,12 @@ These are the ones that catch real regressions; automated tests cannot.
    Health must show that exercise's start screen, not its home screen.
 5. **Reset asks only while counting.** Running chronometer: ↺ shows the dialog,
    ✕ keeps it running. Paused chronometer: ↺ resets with no dialog. Rest
-   countdown: ↺ shows the dialog; left open past zero, the dialog closes.
+   countdown: ↺ asks "Restart rest?" and ■ asks "Stop rest?", ✕ keeps it
+   counting; left open past zero, the dialog closes.
 6. **The rest alarm holds and repeats.** Needs someone wearing the watch: at zero
    it stays on REST OVER and buzzes every 3 s — *including with the screen
-   covered* — until ↺, which needs no confirmation.
+   covered* — until ■ or ↺, neither of which asks. ■ goes back to the presets;
+   ↺ starts the same length again from full.
 
 ## Verified on device — 2026-09-09
 
