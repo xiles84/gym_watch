@@ -505,6 +505,13 @@ every screenshot after it showed the *previous* step's screen — so the whole
 run looked plausible frame by frame. Wake, `sleep 2`, then act. Identical byte
 counts for screenshots of different screens mean the UI did not move.
 
+Even with the pause, a two-minute scripted run fell out of the app halfway: the
+screen slept, the watch face came back, and the next long-press opened the
+*watch face picker* — the script was editing the user's watch, not the app. A
+1975-byte frame in the middle of a run is the warning. Keep device runs short —
+a handful of gestures — screenshot after each, and look before sending more.
+Gestures that change state (a skin, a visible screen) are the ones to do singly.
+
 ---
 
 ## 24 — The watch has no rotating bezel; the runbook named the wrong model

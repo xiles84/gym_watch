@@ -162,6 +162,21 @@ Not yet verified: haptics, the rest-timer buzz at zero, and the Ongoing Activity
 indicator on the watch face. All need a human wearing the watch — adb cannot
 feel a vibration.
 
+## Verified on device — themed skins, 2026-09-10
+
+Release build with the Dragon Ball, Sailor Moon and Spy × Family skins.
+
+| Check | Result |
+|---|---|
+| Dragon Ball: rest presets, countdown, REST OVER, counter, workouts, workout picker, rest editor, settings, stop dialog | pass — every label readable over the dimmed art |
+| Sailor Moon: the same, plus the chronometer | pass |
+| Rest editor pickers over a wallpaper | pass after a fix — the pickers' black fade drew two dark bars across the art; it is transparent over a wallpaper now |
+| REST OVER ring and ■ | pass — full ring on its black band, ■ in the rest colour |
+| Original skin unchanged | pass |
+| Spy × Family on the watch | **not verified on device** — scripted runs kept falling out of the app (`docs/LESSONS.md` #23). Covered by `WallpaperContrastTest` and the review crops only |
+
+Switch skins by hand under **Settings > SKIN**; there is no deep link for it.
+
 ## Pairing, as actually done
 
 mDNS discovery removes the need to read the IP off the watch:
