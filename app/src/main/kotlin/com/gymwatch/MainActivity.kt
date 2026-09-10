@@ -7,6 +7,9 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.gymwatch.adapters.driving.service.GymSessionService
@@ -32,9 +35,19 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission(),
     ) { /* Declined is survivable: only the indicator is lost, never a timer. */ }
 
+    /**
+     * The screen a caller asked for, held as state rather than read once.
+     *
+     * Android delivers a new intent to the *running* Activity instead of
+     * recreating it, so reading this only in [onCreate] would make a tap on the
+     * watch-face indicator do nothing whenever the app was already open.
+     */
+    private var pendingScreen by mutableStateOf<AppScreen?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        pendingScreen = screenFrom(intent)
         requestNotificationPermissionIfNeeded()
         observeTimerState()
 
@@ -45,19 +58,24 @@ class MainActivity : ComponentActivity() {
                 counter = container.counter,
                 profiles = container.profiles,
                 screenLayout = container.screenLayout,
-                initialScreen = requestedScreen(),
+                requestedScreen = pendingScreen,
+                onScreenHandled = { pendingScreen = null },
             )
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pendingScreen = screenFrom(intent)
+    }
+
     /**
-     * Which screen to open on.
-     *
      * Carries a screen *name*, not a page index: once screens can be reordered
      * and hidden, index 2 means nothing stable. The name is resolved against the
      * current layout, and an unknown or hidden one falls back to the first page.
      */
-    private fun requestedScreen(): AppScreen? =
+    private fun screenFrom(intent: Intent?): AppScreen? =
         intent?.getStringExtra(EXTRA_SCREEN)
             ?.let { name -> AppScreen.entries.firstOrNull { it.name == name } }
 

@@ -6,19 +6,15 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material3.Picker
-import androidx.wear.compose.material3.PickerGroup
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.rememberPickerState
 import kotlin.time.Duration
@@ -57,10 +53,11 @@ fun RestPresetEditor(
             .coerceIn(0, SECOND_OPTIONS - 1),
     )
 
-    var selectedColumn by remember { mutableIntStateOf(0) }
 
     Column(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 14.dp, vertical = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -71,41 +68,49 @@ fun RestPresetEditor(
             letterSpacing = 1.5.sp,
         )
 
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(6.dp))
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            PickerGroup(
-                selectedPickerState = if (selectedColumn == 0) minuteState else secondState,
-            ) {
-                PickerGroupItem(
-                    pickerState = minuteState,
-                    selected = selectedColumn == 0,
-                    onSelected = { selectedColumn = 0 },
-                    modifier = Modifier.width(56.dp),
-                    contentDescription = { "${minuteState.selectedOptionIndex} minutes" },
-                ) { optionIndex, _ ->
-                    PickerOption(
-                        text = optionIndex.toString(),
-                        highlighted = optionIndex == minuteState.selectedOptionIndex,
-                    )
-                }
-                PickerGroupItem(
-                    pickerState = secondState,
-                    selected = selectedColumn == 1,
-                    onSelected = { selectedColumn = 1 },
-                    modifier = Modifier.width(56.dp),
-                    contentDescription = { "${secondState.selectedOptionIndex * SECOND_STEP} seconds" },
-                ) { optionIndex, _ ->
-                    PickerOption(
-                        text = "%02d".format(optionIndex * SECOND_STEP),
-                        highlighted = optionIndex == secondState.selectedOptionIndex,
-                    )
-                }
+        // Two plain Pickers rather than a PickerGroup: a group centres whichever
+        // column is "selected" and renders the other read-only, which shunts the
+        // pair off-centre and misaligns the rows. Here both columns stay live,
+        // aligned, and flickable — you set minutes and seconds without first
+        // tapping to choose a column.
+        //
+        // The height is essential: a Picker fills whatever it is given, so
+        // unconstrained it eats the screen and pushes everything else off.
+        Row(
+            modifier = Modifier.height(92.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Picker(
+                state = minuteState,
+                contentDescription = { "${minuteState.selectedOptionIndex} minutes" },
+                modifier = Modifier.width(50.dp),
+                gradientColor = GymColors.Background,
+            ) { optionIndex ->
+                PickerOption(
+                    text = optionIndex.toString(),
+                    highlighted = optionIndex == minuteState.selectedOptionIndex,
+                )
+            }
+
+            Text(":", color = GymColors.Rest, fontSize = 22.sp)
+
+            Picker(
+                state = secondState,
+                contentDescription = { "${secondState.selectedOptionIndex * SECOND_STEP} seconds" },
+                modifier = Modifier.width(50.dp),
+                gradientColor = GymColors.Background,
+            ) { optionIndex ->
+                PickerOption(
+                    text = "%02d".format(optionIndex * SECOND_STEP),
+                    highlighted = optionIndex == secondState.selectedOptionIndex,
+                )
             }
         }
 
-        Spacer(Modifier.height(4.dp))
-        Text("swipe each column", color = GymColors.Dim, fontSize = 9.sp)
+        Spacer(Modifier.height(6.dp))
+        Text("min · sec", color = GymColors.Dim, fontSize = 9.sp)
         Spacer(Modifier.height(8.dp))
 
         RoundButton(

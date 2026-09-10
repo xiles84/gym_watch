@@ -11,6 +11,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,7 +49,8 @@ fun GymApp(
     counter: CounterUseCase,
     profiles: ProfilesUseCase,
     screenLayout: ScreenLayoutUseCase,
-    initialScreen: AppScreen? = null,
+    requestedScreen: AppScreen? = null,
+    onScreenHandled: () -> Unit = {},
 ) {
     val layout by screenLayout.state.collectAsStateWithLifecycle()
     val profilesState by profiles.state.collectAsStateWithLifecycle()
@@ -58,7 +60,7 @@ fun GymApp(
     // hidden by the screen that does the hiding.
     val pageCount = visible.size + 1
 
-    val startPage = initialScreen
+    val startPage = requestedScreen
         ?.let { visible.indexOf(it) }
         ?.takeIf { it >= 0 }
         ?: 0
@@ -66,6 +68,19 @@ fun GymApp(
     val pagerState = rememberPagerState(initialPage = startPage) { pageCount }
 
     var editing by remember { mutableStateOf<Editor?>(null) }
+
+    // A request can also arrive while the app is already open — tapping the
+    // watch-face indicator delivers a new intent rather than recreating the
+    // Activity, so honouring it only in initialPage would silently do nothing.
+    LaunchedEffect(requestedScreen, visible) {
+        val target = requestedScreen ?: return@LaunchedEffect
+        val index = visible.indexOf(target)
+        if (index >= 0) {
+            editing = null
+            pagerState.animateScrollToPage(index)
+        }
+        onScreenHandled()
+    }
 
     GymTheme {
         Box(Modifier.fillMaxSize().background(GymColors.Background)) {

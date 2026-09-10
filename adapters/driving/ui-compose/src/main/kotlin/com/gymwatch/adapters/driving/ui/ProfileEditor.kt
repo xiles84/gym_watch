@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -154,44 +156,50 @@ private fun SettingRow(label: String, value: String, onClick: () -> Unit) {
     }
 }
 
-/** Every kind this app knows. The watch no longer limits the list, because we
- *  are not asking it to track anything — the kind is a label and a set of rest
- *  times, so nothing here can be "unsupported". */
+/**
+ * Every kind this app knows. The watch no longer limits the list, because we
+ * are not asking it to track anything — the kind is a label and a set of rest
+ * times, so nothing here can be "unsupported".
+ *
+ * Ten rows on a round screen needs [ScalingLazyColumn], not a scrolling Column:
+ * it centres the list and shrinks items toward the rim, so the first and last
+ * are not clipped by the curve.
+ */
 @Composable
 private fun KindPicker(
     selected: ExerciseKind,
     onPick: (ExerciseKind) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 26.dp, vertical = 40.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+    ScalingLazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text("WORKOUT", color = GymColors.Muted, fontSize = 10.sp, letterSpacing = 1.5.sp)
-        Spacer(Modifier.height(6.dp))
+        item {
+            Text("WORKOUT", color = GymColors.Muted, fontSize = 10.sp, letterSpacing = 1.5.sp)
+        }
 
         ExerciseKind.entries.forEach { kind ->
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 3.dp)
-                    .background(
-                        if (kind == selected) GymColors.Rest else GymColors.Surface,
-                        RoundedCornerShape(percent = 50),
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            if (kind == selected) GymColors.Rest else GymColors.Surface,
+                            RoundedCornerShape(percent = 50),
+                        )
+                        .clickable { onPick(kind) }
+                        .padding(vertical = 9.dp, horizontal = 14.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = kind.glyph + "  " + kind.displayName,
+                        color = if (kind == selected) GymColors.Background else GymColors.OnSurface,
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center,
                     )
-                    .clickable { onPick(kind) }
-                    .padding(vertical = 9.dp, horizontal = 14.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = kind.glyph + "  " + kind.displayName,
-                    color = if (kind == selected) GymColors.Background else GymColors.OnSurface,
-                    fontSize = 13.sp,
-                    textAlign = TextAlign.Center,
-                )
+                }
             }
         }
     }
