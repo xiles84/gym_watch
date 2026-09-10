@@ -1,28 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-feature android:name="android.hardware.type.watch" />
 
-    <!-- Foreground service: required for the timer to keep firing, and required
-         by Health Services from the prepare phase onward (LESSONS.md #4). -->
+    <!-- Foreground service: required for the timer to keep firing while the
+         screen is off. The `health` type and every health permission are gone
+         with the exercise tracking that needed them — Samsung Health records
+         workouts now (docs/LESSONS.md #2). Each remaining permission is
+         declared by the module that uses it (#18); these are the app's own. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.VIBRATE" />
 
-    <!-- Health permissions split at API 36 (LESSONS.md #5). Both sets are
-         declared; AndroidPermissions picks which to request at runtime. -->
-    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
-    <uses-permission
-        android:name="android.permission.BODY_SENSORS"
-        android:maxSdkVersion="35" />
-    <uses-permission
-        android:name="android.permission.BODY_SENSORS_BACKGROUND"
-        android:maxSdkVersion="35" />
-    <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
-    <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND" />
+    <!-- Samsung Health is opened by package name, the only supported way in.
+         Wear OS still requires the target to be declared to be visible to
+         PackageManager queries. -->
+    <queries>
+        <package android:name="com.samsung.android.wear.shealth" />
+    </queries>
 
     <application
         android:name=".GymApplication"

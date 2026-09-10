@@ -6,7 +6,8 @@ Everything here assumes `source scripts/env.sh` has been run first.
 
 | | |
 |---|---|
-| Watch model | **SM-L705F** (Galaxy Watch 8 Classic) |
+| Watch model | **SM-L705F** — Galaxy Watch **Ultra** (47mm, LTE) |
+| Rotating bezel | **None.** The bezel is static; there is a *touch* bezel only |
 | `ro.build.version.release` | **16** — Wear OS 6 |
 | `ro.build.version.sdk` | **36** |
 | ABI | **armeabi-v7a** (32-bit ARM) |
@@ -18,9 +19,19 @@ So `targetSdk = 36`. `compileSdk` stays **37** because `android-37.0` is the onl
 platform installed — compiling ahead of the target is fine, targeting ahead of
 a device you cannot test is not.
 
-The API-36 split in `AndroidPermissions` is therefore the *live* path on this
-watch: heart rate is `android.permission.health.READ_HEART_RATE`, not
-`BODY_SENSORS`.
+**This entry said "Galaxy Watch 8 Classic" until 2026-09-09 and that was wrong.**
+The Classic is the model with the physical rotating bezel; the Ultra has none.
+The mistake was inherited by every UI decision that assumed one could be turned.
+See `docs/LESSONS.md` #24. Verify the marketing name against the model number
+rather than assuming it:
+
+```bash
+adb shell getprop ro.product.model      # SM-L705F
+```
+
+No health permissions are requested any more — the app reads no health data and
+Samsung Health owns the workout record (`docs/LESSONS.md` #2). The only runtime
+permission is `POST_NOTIFICATIONS`.
 
 **A phone is often connected too** (SM-S918B, `192.168.15.122`). With two
 devices attached, every adb command needs `-s`:
@@ -65,18 +76,19 @@ Uninstall: `adb uninstall com.gymwatch`
 
 ## Permissions
 
-Health permissions cannot be pre-granted reliably from adb on Wear — grant them
-in the on-watch dialog the first time. To reset and re-test the flow:
+Only `POST_NOTIFICATIONS`, asked for once on first launch. Declining it costs
+the watch-face indicator and nothing else — the timers derive from the clock and
+keep perfect time either way.
 
 ```bash
-adb shell pm reset-permissions com.gymwatch
+adb shell pm reset-permissions com.gymwatch    # re-test the first-launch prompt
 ```
 
 ## Logs
 
 ```bash
 adb logcat -c                                              # clear first
-adb logcat -v time GymWatch:D HealthServices:D AndroidRuntime:E '*:S'
+adb logcat -v time GymWatch:D AndroidRuntime:E '*:S'
 ```
 
 Health Services specifically:
@@ -132,39 +144,35 @@ adb connect 192.168.15.140:40647
 The pairing port and the connect port are **different** — confirmed here:
 pairing `35649`, connect `40647`.
 
-## Phase 4 verified on device — 2026-09-09
+## Health Services — removed 2026-09-09
 
-| Check | Result |
-|---|---|
-| Permission prompt appears on first workout | pass — `GrantPermissionsActivity`, "access your physical activity" |
-| API-36 permission path is the live one | pass — `health.READ_HEART_RATE`, not `BODY_SENSORS` |
-| Weights workout starts via Health Services | pass |
-| Live metrics | pass — **0:51 elapsed, 72 bpm** from the sensor |
-| Foreground service switches type for a workout | pass — `types=0x00000100` (HEALTH), was `0x40000000` (SPECIAL_USE) |
-| Ending returns to the pager, service stops | pass — `Exercise ended: ENDED reason=4` (USER_END), 0 service records |
+Phase 4 did work on device: a Weights exercise started, live heart rate arrived
+(**0:51, 72 bpm**), and the foreground service switched to `types=0x00000100`
+(HEALTH). It was all deleted anyway.
 
-Granting the permissions for testing (reversible):
+The open question in this section used to be *"does the workout appear in
+Samsung Health?"* The answer, from wearing it: **no, and it cannot.** Three
+independent blocks — see `docs/LESSONS.md` #2. Samsung Health now owns the
+workout record and the app just opens it.
 
-```bash
-adb -s <watch> shell pm grant com.gymwatch android.permission.ACTIVITY_RECOGNITION
-adb -s <watch> shell pm grant com.gymwatch android.permission.health.READ_HEART_RATE
-# undo:
-adb -s <watch> shell pm revoke com.gymwatch android.permission.health.READ_HEART_RATE
-```
+So there are no health permissions to grant, no exercise slot to contend for,
+and `pm grant android.permission.health.READ_HEART_RATE` no longer applies.
 
-Open the app straight on a page (0 chrono, 1 rest, 2 counter, 3 workouts):
+Open the app straight on a screen — by **name**, not index, since screens can
+now be reordered and hidden:
 
 ```bash
-adb -s <watch> shell am start -n com.gymwatch/.MainActivity --ei page 3
+adb -s <watch> shell am start -n com.gymwatch/.MainActivity \
+  --es screen REST_TIMER
 ```
+
+Valid names: `CHRONOMETER`, `REST_TIMER`, `COUNTER`, `PROFILES`. An unknown or
+hidden one falls back to the first visible screen.
 
 ### Still not verified
 
-- **Does the workout appear in Samsung Health?** Health Services recorded it, but
-  where it surfaces is undocumented. Check Samsung Health on the phone for a
-  Weights session around the test time and write the answer into LESSONS.md.
-- **The conflict guard against a real Samsung Health workout.** The code path is
-  unit-tested, but taking the slot from Samsung Health for real has not been
-  tried. Start a workout in Samsung Health, then start one here: it must ask.
-- Rotary bezel, haptics, the rest-timer buzz, and the watch-face indicator —
-  all need a human wearing the watch.
+- Haptics, the rest-timer buzz, and the watch-face indicator — all need a human
+  wearing the watch.
+- Whether the **touch** bezel feeds `onRotaryScrollEvent` on this model. Nothing
+  depends on it: the counter's rotary support is additive, and `Picker` handles
+  both swipe and rotary itself. Worth knowing, not worth blocking on.

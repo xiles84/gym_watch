@@ -1,23 +1,36 @@
 # Gym Watch
 
-A Wear OS app for Samsung Galaxy Watch, built for the gym: a chronometer and
-rest timer, a set counter you can drive with the bezel, and one-tap start for
-three favourite workouts.
+A Wear OS app for Samsung Galaxy Watch, built for the gym: a chronometer, a rest
+timer with three one-tap presets, a set counter, and three workout profiles that
+reconfigure it all per workout. Screens can be reordered or turned off.
 
-Built with a hexagonal architecture so new UI surfaces — a tile, a watch face,
-a different health backend — are new adapters, not a rewrite of the core.
+Built with a hexagonal architecture so new UI surfaces — a tile, a watch face —
+are new adapters, not a rewrite of the core.
 
 ## Status
 
 | Phase | |
 |---|---|
-| 0 · Toolchain and device ground truth | done — SM-L705F, Wear OS 6, API 36 |
+| 0 · Toolchain and device ground truth | done — SM-L705F (Galaxy Watch **Ultra**), Wear OS 6, API 36 |
 | 1 · Skeleton, version catalog, guardrails | done |
-| 2 · Domain and use cases, pure JVM | done — 57 tests green |
-| 3 · Compose UI, persistence, foreground service | **done — verified on a real Galaxy Watch 8** |
-| 4 · Workouts via Health Services | **done — live HR on device** |
-| 5 · Tile *(optional)* | next |
-| 6 · WFF watch face *(optional)* | |
+| 2 · Domain and use cases, pure JVM | done |
+| 3 · Compose UI, persistence, foreground service | done — verified on the watch |
+| 4 · Workouts via Health Services | **removed** — it could never reach Samsung Health |
+| 5 · Rest presets, profiles, configurable screens | **done — 77 tests green** |
+| 6 · Tile *(optional)* | next |
+| 7 · WFF watch face *(optional)* | |
+
+## Workouts and Samsung Health
+
+Samsung Health records the workout; this app does not try to. A third-party watch
+app has no way to write one — `ExerciseClient` streams live metrics but persists
+nothing, Health Connect does not run on Wear OS, and Samsung Health has no
+third-party write API. Tracking our own exercise also *ended* whatever Samsung
+Health was recording, because the platform allows one at a time device-wide.
+
+So the three profiles configure what this app can genuinely own — rest lengths
+and what the counter counts — and a button opens Samsung Health to do the
+recording. The full reasoning is in `docs/LESSONS.md` entry 2.
 
 ## Quick start
 

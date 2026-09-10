@@ -10,12 +10,16 @@ import android.util.Log
 import com.gymwatch.adapters.driven.platform.GymNotifications
 
 /**
- * Keeps the process alive while a timer or workout is running.
+ * Keeps the process alive while a timer is running.
  *
- * The foreground service *type* is chosen per session, and that matters:
- * `health` requires one of ACTIVITY_RECOGNITION / READ_HEART_RATE to be
- * **granted at runtime**, and throws SecurityException otherwise. A chronometer
- * has no business claiming it. See docs/LESSONS.md #19.
+ * The type is always `specialUse`. It used to be chosen per session because a
+ * Health Services exercise needs `health`, which in turn needs a runtime
+ * permission granted or `startForeground` throws (docs/LESSONS.md #19). The app
+ * no longer runs exercises — Samsung Health does — so the health type, and the
+ * permissions it dragged in, are gone.
+ *
+ * `specialUse` is the honest description of what this is: a chronometer and a
+ * rest timer, which are not health tracking.
  */
 class GymSessionService : Service() {
 
@@ -26,7 +30,6 @@ class GymSessionService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val title = intent?.getStringExtra(EXTRA_TITLE) ?: "Gym Watch"
         val status = intent?.getStringExtra(EXTRA_STATUS) ?: "Session running"
-        val health = intent?.getBooleanExtra(EXTRA_HEALTH, false) ?: false
         val launch = intent?.getParcelableExtra<Intent>(EXTRA_LAUNCH_INTENT)
             ?: packageManager.getLaunchIntentForPackage(packageName)
             ?: Intent()
@@ -42,18 +45,17 @@ class GymSessionService : Service() {
         return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 // Foreground service types only exist from API 34.
-                val type = if (health) {
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH
-                } else {
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-                }
-                startForeground(GymNotifications.NOTIFICATION_ID, notification, type)
+                startForeground(
+                    GymNotifications.NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
+                )
             } else {
                 startForeground(GymNotifications.NOTIFICATION_ID, notification)
             }
             START_NOT_STICKY
         } catch (e: Exception) {
-            Log.w(TAG, "Foreground service refused (health=$health); continuing without it", e)
+            Log.w(TAG, "Foreground service refused; continuing without it", e)
             stopSelf()
             START_NOT_STICKY
         }
@@ -68,24 +70,12 @@ class GymSessionService : Service() {
         private const val TAG = "GymWatch"
         private const val EXTRA_TITLE = "title"
         private const val EXTRA_STATUS = "status"
-        private const val EXTRA_HEALTH = "health"
         private const val EXTRA_LAUNCH_INTENT = "launch"
 
-        /**
-         * @param health true only while a Health Services exercise is running.
-         *   Requires ACTIVITY_RECOGNITION or READ_HEART_RATE to be granted.
-         */
-        fun start(
-            context: Context,
-            title: String,
-            status: String,
-            launchIntent: Intent,
-            health: Boolean = false,
-        ) {
+        fun start(context: Context, title: String, status: String, launchIntent: Intent) {
             val intent = Intent(context, GymSessionService::class.java)
                 .putExtra(EXTRA_TITLE, title)
                 .putExtra(EXTRA_STATUS, status)
-                .putExtra(EXTRA_HEALTH, health)
                 .putExtra(EXTRA_LAUNCH_INTENT, launchIntent)
             runCatching { context.startForegroundService(intent) }
         }

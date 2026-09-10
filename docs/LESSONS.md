@@ -29,19 +29,48 @@ and it can launch. Nothing else.
 
 ---
 
-## 2 — There is no supported deep link into a specific Samsung Health exercise
-*2026-09-09 · platform*
+## 2 — A third-party watch app cannot get a workout into Samsung Health
+*2026-09-09 · platform · corrected 2026-09-09 after testing on the watch*
 
-**Cause:** community attempts at `health://` and similar URI schemes do not
-work. Only `getLaunchIntentForPackage("com.samsung.android.wear.shealth")` is
-documented, and it lands on the app's home screen.
+**This entry originally said** "our app records the workout itself with Health
+Services `ExerciseClient`, which is officially supported." That was wrong, and
+it cost a whole phase of work. `ExerciseClient` is a *live metrics* API. It
+persists nothing.
 
-**Fix:** our app records the workout itself with Health Services
-`ExerciseClient`, which is officially supported.
+**Symptom:** workouts started in the app never appeared in Samsung Health.
 
-**Avoid it by:** not spending time reverse-engineering Samsung Health intents.
-If this is ever revisited, the probe is
-`adb shell dumpsys package com.samsung.android.wear.shealth`.
+**Cause:** three separate blocks, each sufficient on its own.
+
+1. **`ExerciseClient` saves nothing.** Google's own guide says to persist the
+   stream yourself with Room and upload it with WorkManager. Ending an exercise
+   discards it.
+2. **Health Connect does not run on Wear OS.** Samsung's Health Connect FAQ:
+   *"The Health Connect application can be installed on Android mobile devices.
+   It does not support Wear OS devices."* The bridge into Samsung Health exists
+   only on the phone.
+3. **Samsung Health has no third-party write API.** Integration is curated
+   partnerships (Strava, Technogym). There is nothing to call.
+
+And there is still no deep link into a specific exercise — community attempts at
+`health://` and similar URI schemes do not work. Only
+`getLaunchIntentForPackage("com.samsung.android.wear.shealth")` is documented,
+and it lands on the app's home screen.
+
+**Worse than useless:** the platform allows one exercise device-wide (#3). If
+Samsung Health was recording and the user tapped a workout in our app, our
+conflict dialog offered to *end Samsung Health's session* — the feature was
+wired to destroy the very history it was supposed to create.
+
+**Fix:** the app stopped tracking exercises. Samsung Health owns the workout
+record; `CompanionHealthAppPort` just opens it. The three slots became
+*profiles* that configure what we can actually own — rest lengths and the
+counter label. `:adapters:driven:health` was deleted, and with it the health
+foreground-service type (#19), the heart-rate permission split (#5) and the
+`RestrictedApi` suppressions (#21).
+
+**Avoid it by:** asking "what persists this, and who can read it?" *before*
+building on a platform API. A streaming API and a recording API are not the same
+thing, however similar the names look.
 
 ---
 
@@ -51,11 +80,14 @@ If this is ever revisited, the probe is
 **Cause:** the constraint is global, not per-app. If Samsung Health is tracking
 a workout and we call `startExerciseAsync`, theirs ends.
 
-**Fix:** `WorkoutUseCase.requestStart` calls `ownership()` first and returns
-`StartOutcome.NeedsConfirmation` rather than starting. Only `forceStart` takes
-the slot, and only after the user confirms.
+**Fix (now):** the app does not start exercises at all, so it can never take the
+slot. This constraint is *why* — see #2. The rule survives its own
+implementation: if a health backend is ever reintroduced, the slot belongs to
+whoever is already using it.
 
-**Avoid it by:** never calling `session.start()` directly from UI code.
+**Originally:** `WorkoutUseCase.requestStart` checked `ownership()` and returned
+`StartOutcome.NeedsConfirmation` rather than starting. That code is gone, along
+with the conflict dialog that offered to end Samsung Health's session.
 
 ---
 
@@ -69,6 +101,11 @@ running — and the requirement starts at `prepareExerciseAsync`, not at
 
 **Fix:** start the service before preparing sensors, stop it after
 `endExerciseAsync` completes.
+
+**Note (2026-09-09):** the app no longer runs exercises (#2), so nothing here is
+live code. Worth keeping because it was also violated: `GymApp` awaited
+`requestStart` and only *then* started the service, i.e. exactly backwards. If a
+health backend ever returns, that ordering is the first thing to get right.
 
 ---
 
@@ -84,6 +121,11 @@ declared with `android:maxSdkVersion="35"`.
 
 **Avoid it by:** declaring both sets with `maxSdkVersion` on the legacy pair,
 and resolving which to *request* at runtime from `Build.VERSION.SDK_INT`.
+
+**Note (2026-09-09):** none of these are declared any more. The app reads no
+health data (#2), so `AndroidPermissions` and `HealthPermission` were deleted and
+`POST_NOTIFICATIONS` is the only runtime permission left. Kept for the API-level
+split itself, which is the part that is easy to get wrong.
 
 ---
 
@@ -349,6 +391,13 @@ permissions it does not need.
 permissions are granted. Verified on device: `types=0x40000000` is
 `FOREGROUND_SERVICE_TYPE_SPECIAL_USE`.
 
+**Update (2026-09-09):** the health branch is gone — the app no longer runs
+exercises (#2), so the type is unconditionally `SPECIAL_USE` and
+`FOREGROUND_SERVICE_HEALTH` is no longer declared. The design point stands and
+was the right call twice over: a chronometer and a rest timer are not health
+tracking, and saying so in the manifest is what made removing the health path a
+one-line change instead of an audit.
+
 **And:** `startForeground` is now wrapped in try/catch. If the platform refuses,
 the service stops itself and the app carries on — the timers are clock-derived
 and keep perfect time regardless; only the notification is lost. Never let a
@@ -397,6 +446,9 @@ to use the API. A packaging bug, not a real boundary.
 with the reason inline. Do not disable the check project-wide — it is a useful
 rule everywhere else.
 
+**Note (2026-09-09):** moot here — `:adapters:driven:health` was deleted with the
+exercise tracking (#2), and lint is now clean with no suppressions anywhere.
+
 ---
 
 ## 22 — Git Bash rewrites device paths in adb arguments
@@ -441,3 +493,38 @@ earns its place in the app.
 
 **Also:** a black 1975-byte screencap means the screen is off (lesson 20); a real
 one here is 10–70 KB.
+
+---
+
+## 24 — The watch has no rotating bezel; the runbook named the wrong model
+*2026-09-09 · platform · found by the user*
+
+**Symptom:** the user reported "my watch doesnt have a bezel" — after the rest
+timer and counter had both been built around turning one.
+
+**Cause:** `docs/DEVICE-RUNBOOK.md` recorded **SM-L705F** as a "Galaxy Watch 8
+Classic". It is a **Galaxy Watch Ultra**. The Classic is the model with the
+physical rotating bezel; the Ultra's bezel is static. It has a *touch* bezel —
+a fingertip dragged around the rim — which is a different interaction and a poor
+one with sweaty hands mid-set.
+
+The model name was never verified; only `ro.build.version.sdk` and friends were
+read off the device, and the marketing name was filled in by assumption. Every
+later decision inherited it.
+
+**Consequence:** `Rotary.kt` and `onRotaryScrollEvent` were the *only* way to
+change the rest length. On this hardware there was effectively no way to set it
+at all, which is what prompted the rest-preset feature in the first place.
+
+**Fix:** every value is now settable by touch. Rest lengths are three tappable
+presets, edited with a two-column `Picker`/`PickerGroup` wheel. `rotaryStepper`
+survives only as an additive bonus on the counter — if the touch bezel does feed
+rotary events it works, and nothing breaks if it does not. `Picker` brings
+`PickerDefaults.rotarySnapBehavior` for free, so that screen needs no rotary code
+of its own. The `↻ bezel` on-screen hints were removed: they described hardware
+that is not there.
+
+**Avoid it by:** verifying the marketing name against the model number, not the
+other way round, and treating "which physical inputs does this device have" as
+device ground truth to be checked (#7) rather than inferred from a product line.
+`ro.product.model` gives the number; the number has to be looked up.

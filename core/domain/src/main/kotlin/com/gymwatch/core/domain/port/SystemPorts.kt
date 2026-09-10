@@ -1,7 +1,6 @@
 package com.gymwatch.core.domain.port
 
 import com.gymwatch.core.domain.model.Haptic
-import com.gymwatch.core.domain.model.HealthPermission
 
 fun interface HapticsPort {
     fun play(haptic: Haptic)
@@ -17,7 +16,19 @@ interface OngoingActivityPort {
     fun clear()
 }
 
-interface PermissionsPort {
-    suspend fun granted(permission: HealthPermission): Boolean
-    suspend fun requestAll(): Boolean
+/**
+ * The watch's own health app — on a Galaxy Watch, Samsung Health.
+ *
+ * It owns the workout record, because nothing else can: Health Services streams
+ * live metrics but persists nothing, Health Connect does not run on Wear OS, and
+ * Samsung Health has no third-party write API. See docs/LESSONS.md #2.
+ *
+ * No package name appears here on purpose. Which app this is, and the fact that
+ * only `getLaunchIntentForPackage` works to reach it, are adapter concerns.
+ */
+interface CompanionHealthAppPort {
+    suspend fun isAvailable(): Boolean
+
+    /** Returns false if the app is missing or refused to launch. */
+    suspend fun open(): Boolean
 }

@@ -23,7 +23,6 @@ include(":core:application")
 // --- driven adapters: the core's outbound edges ---
 include(":adapters:driven:platform")
 include(":adapters:driven:persistence")
-include(":adapters:driven:health")
 
 // --- driving adapters: what calls into the core ---
 include(":adapters:driving:ui-compose")

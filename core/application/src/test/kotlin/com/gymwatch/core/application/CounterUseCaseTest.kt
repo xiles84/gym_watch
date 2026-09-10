@@ -55,12 +55,4 @@ class CounterUseCaseTest {
         assertEquals(0, useCase.state.value.value)
         assertEquals(listOf(Haptic.CONFIRM), haptics.played)
     }
-
-    @Test
-    fun `label survives a reset`() = runTest {
-        val (useCase, _, s) = scope(Counter(value = 8, label = "BENCH"))
-        useCase.reset()
-        s.runCurrent()
-        assertEquals("BENCH", useCase.state.value.label)
-    }
 }

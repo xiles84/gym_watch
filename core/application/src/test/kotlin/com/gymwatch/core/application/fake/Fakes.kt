@@ -1,18 +1,15 @@
 package com.gymwatch.core.application.fake
 
 import com.gymwatch.core.domain.model.Counter
-import com.gymwatch.core.domain.model.ExerciseKind
-import com.gymwatch.core.domain.model.Favourites
-import com.gymwatch.core.domain.model.SessionOwnership
-import com.gymwatch.core.domain.model.WorkoutSnapshot
-import com.gymwatch.core.domain.model.WorkoutState
-import com.gymwatch.core.domain.port.ClockPort
-import com.gymwatch.core.domain.port.CounterRepositoryPort
-import com.gymwatch.core.domain.port.FavouritesRepositoryPort
 import com.gymwatch.core.domain.model.Haptic
+import com.gymwatch.core.domain.model.Profiles
+import com.gymwatch.core.domain.model.ScreenLayout
+import com.gymwatch.core.domain.port.ClockPort
+import com.gymwatch.core.domain.port.CompanionHealthAppPort
+import com.gymwatch.core.domain.port.CounterRepositoryPort
 import com.gymwatch.core.domain.port.HapticsPort
-import com.gymwatch.core.domain.port.RestTimerSettingsPort
-import com.gymwatch.core.domain.port.WorkoutSessionPort
+import com.gymwatch.core.domain.port.ProfilesRepositoryPort
+import com.gymwatch.core.domain.port.ScreenLayoutRepositoryPort
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -46,56 +43,43 @@ class InMemoryCounterRepository(initial: Counter = Counter()) : CounterRepositor
     override suspend fun save(counter: Counter) { flow.value = counter }
 }
 
-class InMemoryFavouritesRepository(
-    initial: Favourites = Favourites.DEFAULT,
-) : FavouritesRepositoryPort {
+class InMemoryProfilesRepository(
+    initial: Profiles = Profiles.DEFAULT,
+) : ProfilesRepositoryPort {
     private val flow = MutableStateFlow(initial)
-    override val favourites: StateFlow<Favourites> = flow.asStateFlow()
-    override suspend fun save(favourites: Favourites) { flow.value = favourites }
-}
-
-class InMemoryRestTimerSettings(initial: Duration) : RestTimerSettingsPort {
-    private val flow = MutableStateFlow(initial)
-    override val duration: StateFlow<Duration> = flow.asStateFlow()
-    var saved: Duration? = null
+    override val profiles: StateFlow<Profiles> = flow.asStateFlow()
+    var saved: Profiles? = null
         private set
-    override suspend fun save(duration: Duration) {
-        saved = duration
-        flow.value = duration
+    override suspend fun save(profiles: Profiles) {
+        saved = profiles
+        flow.value = profiles
     }
 }
 
-class FakeWorkoutSession(
-    private val supported: Set<ExerciseKind> = ExerciseKind.entries.toSet(),
-    var ownership: SessionOwnership = SessionOwnership.NONE,
-) : WorkoutSessionPort {
-    private val flow = MutableStateFlow<WorkoutSnapshot?>(null)
-    override val snapshots: StateFlow<WorkoutSnapshot?> = flow.asStateFlow()
+class InMemoryScreenLayoutRepository(
+    initial: ScreenLayout = ScreenLayout.DEFAULT,
+) : ScreenLayoutRepositoryPort {
+    private val flow = MutableStateFlow(initial)
+    override val layout: StateFlow<ScreenLayout> = flow.asStateFlow()
+    var saved: ScreenLayout? = null
+        private set
+    override suspend fun save(layout: ScreenLayout) {
+        saved = layout
+        flow.value = layout
+    }
+}
 
-    val startedKinds = mutableListOf<ExerciseKind>()
-    var ended = false
+class FakeHealthApp(
+    private val available: Boolean = true,
+) : CompanionHealthAppPort {
+    var openCount = 0
         private set
 
-    override suspend fun supportedKinds(): Set<ExerciseKind> = supported
-    override suspend fun ownership(): SessionOwnership = ownership
+    override suspend fun isAvailable(): Boolean = available
 
-    override suspend fun start(kind: ExerciseKind) {
-        startedKinds += kind
-        ownership = SessionOwnership.OURS
-        flow.value = WorkoutSnapshot(kind, WorkoutState.ACTIVE, Duration.ZERO)
-    }
-
-    override suspend fun pause() {
-        flow.value = flow.value?.copy(state = WorkoutState.PAUSED)
-    }
-
-    override suspend fun resume() {
-        flow.value = flow.value?.copy(state = WorkoutState.ACTIVE)
-    }
-
-    override suspend fun end() {
-        ended = true
-        ownership = SessionOwnership.NONE
-        flow.value = null
+    override suspend fun open(): Boolean {
+        if (!available) return false
+        openCount++
+        return true
     }
 }

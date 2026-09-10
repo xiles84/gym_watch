@@ -1,42 +1,41 @@
 package com.gymwatch
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.gymwatch.adapters.driving.service.GymSessionService
 import com.gymwatch.adapters.driving.ui.GymApp
+import com.gymwatch.core.domain.model.AppScreen
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
-import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
 
 class MainActivity : ComponentActivity() {
 
     private val container by lazy { (application as GymApplication).container }
 
     /**
-     * Health Services will not start an exercise without these, and the
-     * foreground service cannot use the `health` type without one of them
-     * granted (docs/LESSONS.md #19). Asked for on first workout, not at launch:
-     * the chronometer and counter need nothing, so nothing should be demanded
-     * before they can be used.
+     * The only runtime permission left.
+     *
+     * Health permissions are gone with the exercise tracking that needed them —
+     * Samsung Health records workouts now. POST_NOTIFICATIONS stays because the
+     * foreground service's notification *is* the watch-face Ongoing Activity
+     * indicator, and without the grant it fails silently inside
+     * `GymNotifications.post`, so the indicator would simply never appear.
      */
-    private var pendingPermissionResult: ((Boolean) -> Unit)? = null
-
-    private val permissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions(),
-    ) { results ->
-        val granted = results.values.any { it } || results.isEmpty()
-        pendingPermissionResult?.invoke(granted)
-        pendingPermissionResult = null
-    }
+    private val notificationPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { /* Declined is survivable: only the indicator is lost, never a timer. */ }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        requestNotificationPermissionIfNeeded()
         observeTimerState()
 
         setContent {
@@ -44,34 +43,28 @@ class MainActivity : ComponentActivity() {
                 chronometer = container.chronometer,
                 restTimer = container.restTimer,
                 counter = container.counter,
-                workouts = container.workouts,
-                initialPage = intent?.getIntExtra(EXTRA_PAGE, 0) ?: 0,
-                onWorkoutStateChanged = ::onWorkoutStateChanged,
-                ensurePermissions = ::ensurePermissions,
+                profiles = container.profiles,
+                screenLayout = container.screenLayout,
+                initialScreen = requestedScreen(),
             )
         }
     }
 
-    private suspend fun ensurePermissions(): Boolean {
-        val outstanding = container.permissions.outstanding()
-        if (outstanding.isEmpty()) return true
-        return suspendCoroutine { continuation ->
-            pendingPermissionResult = { granted -> continuation.resume(granted) }
-            permissionLauncher.launch(outstanding.toTypedArray())
-        }
-    }
+    /**
+     * Which screen to open on.
+     *
+     * Carries a screen *name*, not a page index: once screens can be reordered
+     * and hidden, index 2 means nothing stable. The name is resolved against the
+     * current layout, and an unknown or hidden one falls back to the first page.
+     */
+    private fun requestedScreen(): AppScreen? =
+        intent?.getStringExtra(EXTRA_SCREEN)
+            ?.let { name -> AppScreen.entries.firstOrNull { it.name == name } }
 
-    private fun onWorkoutStateChanged(running: Boolean) {
-        if (running) {
-            GymSessionService.start(
-                context = this,
-                title = "Workout",
-                status = "Recording",
-                launchIntent = selfIntent(),
-                health = true,
-            )
-        } else {
-            GymSessionService.stop(this)
+    private fun requestNotificationPermissionIfNeeded() {
+        val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+        if (granted != PackageManager.PERMISSION_GRANTED) {
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 
@@ -86,14 +79,9 @@ class MainActivity : ComponentActivity() {
             combine(
                 container.chronometer.state,
                 container.restTimer.state,
-                container.workouts.snapshot,
-            ) { chrono, rest, workout -> Triple(chrono.isRunning, rest.isRunning, workout != null) }
-                .collect { (chronoRunning, restRunning, workoutRunning) ->
+            ) { chrono, rest -> chrono.isRunning to rest.isRunning }
+                .collect { (chronoRunning, restRunning) ->
                     when {
-                        // A workout owns the service while it runs; it needs the
-                        // health service type, which the timers must not claim.
-                        workoutRunning -> Unit
-
                         restRunning -> GymSessionService.start(
                             this@MainActivity,
                             title = "Rest",
@@ -116,11 +104,11 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         /**
-         * Opens the app on a given page. Used by the Ongoing Activity indicator
-         * and the tile, so a tap lands where the user expects instead of always
-         * on the chronometer.
+         * Opens the app on a given screen, by [AppScreen] name. Used by the
+         * Ongoing Activity indicator and by any future tile, so a tap lands
+         * where the user expects (docs/LESSONS.md #23).
          */
-        const val EXTRA_PAGE = "page"
+        const val EXTRA_SCREEN = "screen"
     }
 
     // No FLAG_ACTIVITY_NEW_TASK / CLEAR_TOP: they break Recents on Wear OS, and

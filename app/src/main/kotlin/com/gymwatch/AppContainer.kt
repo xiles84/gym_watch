@@ -2,17 +2,17 @@ package com.gymwatch
 
 import android.content.Context
 import android.content.Intent
-import com.gymwatch.adapters.driven.health.HealthServicesWorkoutSession
 import com.gymwatch.adapters.driven.persistence.PersistenceAdapters
 import com.gymwatch.adapters.driven.platform.AndroidClock
 import com.gymwatch.adapters.driven.platform.AndroidHaptics
-import com.gymwatch.adapters.driven.platform.AndroidPermissions
 import com.gymwatch.adapters.driven.platform.GymNotifications
 import com.gymwatch.adapters.driven.platform.OngoingActivityAdapter
+import com.gymwatch.adapters.driven.platform.SamsungHealthLauncher
 import com.gymwatch.core.application.ChronometerUseCase
 import com.gymwatch.core.application.CounterUseCase
+import com.gymwatch.core.application.ProfilesUseCase
 import com.gymwatch.core.application.RestTimerUseCase
-import com.gymwatch.core.application.WorkoutUseCase
+import com.gymwatch.core.application.ScreenLayoutUseCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 
@@ -36,8 +36,6 @@ class AppContainer(private val context: Context) {
     private val haptics = AndroidHaptics(context)
     private val notifications = GymNotifications(context)
 
-    val permissions = AndroidPermissions(context)
-
     val ongoingActivity = OngoingActivityAdapter(
         context = context,
         notifications = notifications,
@@ -48,25 +46,30 @@ class AppContainer(private val context: Context) {
 
     private val persistence = PersistenceAdapters(context)
 
-    /** Swapping the health backend means replacing this one line. */
-    private val workoutSession = HealthServicesWorkoutSession(context)
+    /** Samsung Health owns the workout record; we only open it (LESSONS.md #2). */
+    private val healthApp = SamsungHealthLauncher(context)
 
     val chronometer = ChronometerUseCase(AndroidClock, haptics)
 
     val restTimer = RestTimerUseCase(
         clock = AndroidClock,
-        settings = persistence.restTimerSettings,
+        profiles = persistence.profiles,
         haptics = haptics,
         scope = scope,
     )
 
     val counter = CounterUseCase(persistence.counters, haptics, scope)
 
-    val workouts = WorkoutUseCase(
-        session = workoutSession,
-        favouritesRepository = persistence.favourites,
+    val profiles = ProfilesUseCase(
+        repository = persistence.profiles,
+        healthApp = healthApp,
+        haptics = haptics,
+        scope = scope,
+    )
+
+    val screenLayout = ScreenLayoutUseCase(
+        repository = persistence.screenLayout,
         haptics = haptics,
         scope = scope,
     )
 }
-

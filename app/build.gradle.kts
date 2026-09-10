@@ -68,7 +68,6 @@ dependencies {
     implementation(project(":core:application"))
     implementation(project(":adapters:driven:platform"))
     implementation(project(":adapters:driven:persistence"))
-    implementation(project(":adapters:driven:health"))
     implementation(project(":adapters:driving:ui-compose"))
     implementation(project(":adapters:driving:service"))
 

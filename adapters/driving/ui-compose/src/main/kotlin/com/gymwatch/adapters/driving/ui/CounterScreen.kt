@@ -19,9 +19,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.wear.compose.material3.Text
 import com.gymwatch.core.application.CounterUseCase
 
+/**
+ * @param label what is being counted — supplied by the active profile, so
+ *   switching from weights to a run relabels this without touching the count.
+ */
 @Composable
 fun CounterScreen(
     useCase: CounterUseCase,
+    label: String,
     modifier: Modifier = Modifier,
 ) {
     val counter by useCase.state.collectAsStateWithLifecycle()
@@ -29,11 +34,13 @@ fun CounterScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
+            // Kept as a bonus, not a requirement: this watch has no rotating
+            // bezel, so the buttons below are the real interface (LESSONS.md #24).
             .rotaryStepper { direction -> useCase.stepBy(direction) },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Text(counter.label, color = GymColors.Muted, fontSize = 10.sp, letterSpacing = 1.5.sp)
+        Text(label, color = GymColors.Muted, fontSize = 10.sp, letterSpacing = 1.5.sp)
 
         Spacer(Modifier.height(4.dp))
 
@@ -57,6 +64,6 @@ fun CounterScreen(
         }
 
         Spacer(Modifier.height(8.dp))
-        Text("↻ bezel · hold to reset", color = GymColors.Dim, fontSize = 9.sp)
+        Text("hold number to reset", color = GymColors.Dim, fontSize = 9.sp)
     }
 }

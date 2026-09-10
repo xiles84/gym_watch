@@ -1,7 +1,8 @@
 # Gym Watch — working agreement
 
-A Wear OS app for a Samsung Galaxy Watch, used at the gym: chronometer + rest
-timer, a set counter, and one-tap start for three favourite workouts.
+A Wear OS app for a Samsung Galaxy Watch, used at the gym: chronometer, a rest
+timer with three one-tap presets, a set counter, and three workout profiles.
+Screens can be reordered or turned off.
 
 **Read `docs/LESSONS.md` before doing anything non-trivial.** It exists so the
 same problem is not solved twice. Most of what looks like an arbitrary choice in
@@ -30,15 +31,22 @@ If a lesson turns out to be wrong, correct it in place — do not leave both.
    compile there, and `ArchitectureTest` fails the build if it ever does.
 3. **Time enters the core only through `ClockPort`,** backed by
    `SystemClock.elapsedRealtime()`. Never a wall clock — it jumps.
-4. **Health Services allows one exercise device-wide.** Always check ownership
-   before starting; never take the slot from Samsung Health without asking.
+4. **This app does not record workouts — Samsung Health does.** A third-party
+   watch app cannot write one: `ExerciseClient` persists nothing, Health Connect
+   does not run on Wear OS, and Samsung Health has no write API. Tracking our own
+   exercise also *ended* Samsung Health's, because the platform allows one
+   device-wide. Do not reintroduce this. See lesson 2.
+5. **The watch has no rotating bezel.** SM-L705F is a Galaxy Watch **Ultra**;
+   its bezel is static. Every value must be settable by touch. Rotary support is
+   additive only, never the sole way to do anything. See lesson 24.
 
 ## Module map
 
 ```
 :core:domain        kotlin("jvm")  entities + port interfaces. No dependencies.
 :core:application   kotlin("jvm")  use cases. Depends only on :core:domain.
-:adapters:driven:*  Android        DataStore, Health Services, platform
+:adapters:driven:*  Android        DataStore, platform (clock, haptics,
+                                   notifications, Samsung Health launcher)
 :adapters:driving:* Android        Wear Compose UI, foreground service, tile
 :app                               composition root — the only module that
                                    knows every adapter

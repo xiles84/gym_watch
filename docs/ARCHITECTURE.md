@@ -6,7 +6,7 @@ Hexagonal (ports and adapters), enforced by the build rather than by discipline.
         DRIVING (UI)                 CORE                  DRIVEN (infra)
 
   Wear Compose UI     ->  +---------------------------+  ->  DataStore
-  Foreground service  ->  |  :core:application        |  ->  Health Services
+  Foreground service  ->  |  :core:application        |  ->  Samsung Health
   Tile / WFF face     ->  |    use cases              |  ->  Clock / Vibrator
                           |  +---------------------+  |      Ongoing Activity
                           |  |  :core:domain       |  |
@@ -32,19 +32,18 @@ the JVM with no emulator, no device, and no Robolectric.
 
 | Module | Type | Contains |
 |---|---|---|
-| `:core:domain` | kotlin-jvm | `Chronometer`, `RestTimer`, `Counter`, `Favourites`, `ExerciseKind`, `WorkoutSnapshot`; all port interfaces |
-| `:core:application` | kotlin-jvm | `ChronometerUseCase`, `RestTimerUseCase`, `CounterUseCase`, `WorkoutUseCase` |
+| `:core:domain` | kotlin-jvm | `Chronometer`, `RestTimer`, `RestPresets`, `Counter`, `WorkoutProfile`/`Profiles`, `ScreenLayout`, `ExerciseKind`, `CounterLabel`; all port interfaces |
+| `:core:application` | kotlin-jvm | `ChronometerUseCase`, `RestTimerUseCase`, `CounterUseCase`, `ProfilesUseCase`, `ScreenLayoutUseCase` |
 | `:adapters:driven:persistence` | android-lib | DataStore implementations of the repository ports |
-| `:adapters:driven:health` | android-lib | `WorkoutSessionPort` over Health Services `ExerciseClient` |
-| `:adapters:driven:platform` | android-lib | `ClockPort`, `HapticsPort`, `OngoingActivityPort`, `PermissionsPort` |
-| `:adapters:driving:ui-compose` | android-lib | Screens and ViewModels |
-| `:adapters:driving:service` | android-lib | Exercise foreground service |
+| `:adapters:driven:platform` | android-lib | `ClockPort`, `HapticsPort`, `OngoingActivityPort`, `CompanionHealthAppPort` |
+| `:adapters:driving:ui-compose` | android-lib | Screens |
+| `:adapters:driving:service` | android-lib | Timer foreground service |
 | `:app` | android-app | Composition root, manifest, permissions |
 | `:watchface` | android-app | WFF resources only — separate APK |
 
 ## Ports
 
-**Driving** (called by the UI): the four use cases in `:core:application`.
+**Driving** (called by the UI): the five use cases in `:core:application`.
 
 **Driven** (implemented by adapters), in `com.gymwatch.core.domain.port`:
 
@@ -52,15 +51,14 @@ the JVM with no emulator, no device, and no Robolectric.
 |---|---|---|
 | `ClockPort` | `SystemClock.elapsedRealtime()` | Monotonic. Never a wall clock. |
 | `CounterRepositoryPort` | DataStore | |
-| `FavouritesRepositoryPort` | DataStore | |
-| `RestTimerSettingsPort` | DataStore | Stores the configured length only, never a running countdown |
-| `WorkoutSessionPort` | Health Services | The whole health backend, behind one interface |
+| `ProfilesRepositoryPort` | DataStore | The three profiles and their rest lengths. Configured lengths only, never a running countdown |
+| `ScreenLayoutRepositoryPort` | DataStore | Which screens are shown, and in what order |
+| `CompanionHealthAppPort` | `PackageManager` | Opens Samsung Health, which owns the workout record. Names no package — that is the adapter's business |
 | `HapticsPort` | `Vibrator` | |
 | `OngoingActivityPort` | `androidx.wear.ongoing` | |
-| `PermissionsPort` | Android runtime permissions | Hides the API-36 permission split |
 
 `port/` holds interfaces only. Value types such as `Haptic` and
-`HealthPermission` live in `model/`, and `ArchitectureTest` enforces that.
+`CounterLabel` live in `model/`, and `ArchitectureTest` enforces that.
 
 ## The one design decision everything else rests on
 
@@ -90,7 +88,19 @@ and the object graph here is small enough to read on one screen.
 
 - **A new UI surface** (tile, complication, a different face): new module under
   `adapters/driving/`, depending on `:core:application`. The core does not change.
-- **A different health backend:** new implementation of `WorkoutSessionPort`.
-  Swap it in `AppContainer`. Nothing else moves.
+- **A different watch's health app:** new implementation of
+  `CompanionHealthAppPort`. Swap it in `AppContainer`. The package name lives in
+  the adapter, so nothing else moves.
 - **A new domain rule:** it belongs on the entity, with a test in
   `:core:domain`, not in a ViewModel.
+
+## What this app deliberately does not do
+
+It does not record workouts. Health Services streams live metrics but persists
+nothing, Health Connect does not run on Wear OS, and Samsung Health has no
+third-party write API — so a workout tracked here could never reach the history
+the user actually reads. Worse, the platform allows one exercise device-wide, so
+tracking ours *ended* Samsung Health's.
+
+Samsung Health records; this app owns the rest timer, the counter and the
+chronometer, and a profile configures them per workout. See `docs/LESSONS.md` #2.

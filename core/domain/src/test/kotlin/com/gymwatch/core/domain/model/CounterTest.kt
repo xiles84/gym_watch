@@ -28,16 +28,7 @@ class CounterTest {
     }
 
     @Test
-    fun `reset zeroes the value but keeps the label`() {
-        val reset = Counter(value = 12, label = "BENCH").reset()
-        assertEquals(0, reset.value)
-        assertEquals("BENCH", reset.label)
-    }
-
-    @Test
-    fun `labels are trimmed, truncated and never blank`() {
-        assertEquals("BENCH", Counter().withLabel("  BENCH  ").label)
-        assertEquals(Counter.DEFAULT_LABEL, Counter().withLabel("   ").label)
-        assertEquals(Counter.MAX_LABEL_LENGTH, Counter().withLabel("x".repeat(50)).label.length)
+    fun `reset zeroes the value`() {
+        assertEquals(0, Counter(value = 12).reset().value)
     }
 }

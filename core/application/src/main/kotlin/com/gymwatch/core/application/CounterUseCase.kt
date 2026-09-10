@@ -33,8 +33,6 @@ class CounterUseCase(
 
     fun reset() = mutate(Haptic.CONFIRM) { it.reset() }
 
-    fun setLabel(label: String) = mutate(null) { it.withLabel(label) }
-
     /**
      * Reads the *repository*, not [state], before transforming.
      *

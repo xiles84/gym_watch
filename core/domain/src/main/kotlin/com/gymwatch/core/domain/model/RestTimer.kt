@@ -36,13 +36,9 @@ data class RestTimer(
     fun withDuration(new: Duration): RestTimer =
         copy(duration = new.coerceIn(MIN, MAX), startMark = null)
 
-    /** Step the configured rest length, e.g. from the rotary bezel. */
-    fun adjustBy(delta: Duration): RestTimer = withDuration(duration + delta)
-
     companion object {
         val MIN = 5.seconds
         val MAX = 15.minutes
         val DEFAULT = 90.seconds
-        val STEP = 15.seconds
     }
 }

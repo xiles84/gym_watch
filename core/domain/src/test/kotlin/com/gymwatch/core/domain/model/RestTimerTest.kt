@@ -50,9 +50,9 @@ class RestTimerTest {
     }
 
     @Test
-    fun `adjusting duration cancels any run in progress`() {
-        val adjusted = RestTimer(duration = 60.seconds).start(0.seconds).adjustBy(15.seconds)
-        assertEquals(75.seconds, adjusted.duration)
-        assertFalse(adjusted.isRunning)
+    fun `changing duration cancels any run in progress`() {
+        val changed = RestTimer(duration = 60.seconds).start(0.seconds).withDuration(75.seconds)
+        assertEquals(75.seconds, changed.duration)
+        assertFalse(changed.isRunning)
     }
 }
