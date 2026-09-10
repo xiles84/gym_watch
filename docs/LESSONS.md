@@ -528,3 +528,63 @@ that is not there.
 other way round, and treating "which physical inputs does this device have" as
 device ground truth to be checked (#7) rather than inferred from a product line.
 `ro.product.model` gives the number; the number has to be looked up.
+
+---
+
+## 25 — Wear layout only fails on a round screen, and Picker eats the screen
+*2026-09-09 · ui · found on device*
+
+Three separate faults, all invisible until the APK was on the watch.
+
+**Picker fills whatever height it is given.** The rest preset editor rendered
+its title jammed against the top, the columns shoved off-centre, and the hint
+and confirm button nowhere at all. `Picker` is a scrollable list: inside a
+`Column` with `Arrangement.Center` it takes the whole viewport and evicts its
+siblings. **Always give a Picker an explicit height** — `Modifier.height(92.dp)`
+shows the selected option plus one either side.
+
+**PickerGroup centres the *selected* column.** With minutes selected, the pair
+sat right of centre and the read-only seconds column was vertically misaligned
+against it. That is the system time-picker idiom, and it is wrong for setting a
+duration where both fields matter equally. Two plain `Picker`s in a `Row` with a
+`Text(":")` between them keeps both columns live, aligned and flickable, and
+costs only the focus handling that a touch-driven watch does not need anyway
+(#24).
+
+**A round screen clips full-width rows at top and bottom.** A `Column` +
+`verticalScroll` looks correct in a preview and loses its first and last rows on
+the device. `ScalingLazyColumn` is the component that knows about the curve — it
+pads for it and scales items toward the rim. Use it for any list on Wear.
+Set `autoCentering = null` for a short fixed list, or it centres the first item
+and leaves half a screen of black above it.
+
+**Avoid it by:** never trusting a Wear layout that has not been screenshotted on
+the device, and reaching for the Wear component before the generic Compose one.
+`adb exec-out screencap` costs seconds; see #20 and #23 for driving it.
+
+---
+
+## 26 — An Activity that is already running does not re-read its intent
+*2026-09-09 · correctness · found on device*
+
+**Symptom:** `am start ... --es screen REST_TIMER` printed
+`Activity not started, intent has been delivered to currently running top-most
+instance` and the app stayed exactly where it was.
+
+**Cause:** `MainActivity` read the extra in `onCreate`. Android delivers a new
+intent to the *live* Activity rather than recreating it, so the extra was only
+ever honoured on a cold start.
+
+This is not a test-harness detail: the Ongoing Activity indicator on the watch
+face is a `PendingIntent` into this same Activity. Tapping it while the app was
+already open — the common case, since the indicator only exists *because*
+something of ours is running — went nowhere.
+
+**Fix:** hold the requested screen in `mutableStateOf`, set it from both
+`onCreate` and `onNewIntent` (calling `setIntent`), and let a `LaunchedEffect`
+scroll the pager and clear it. Clearing matters: without it the effect will not
+re-fire for the same screen twice.
+
+**Avoid it by:** treating `onCreate`-only intent reads as a bug whenever the
+Activity can be reached while already running — which is any launcher Activity
+with a notification or tile pointing at it.
