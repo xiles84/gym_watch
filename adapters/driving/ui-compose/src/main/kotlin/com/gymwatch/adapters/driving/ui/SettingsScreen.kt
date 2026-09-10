@@ -10,52 +10,51 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.material3.Text
 import com.gymwatch.core.application.ScreenLayoutUseCase
+import com.gymwatch.core.application.SkinUseCase
+import com.gymwatch.core.domain.model.Skin
 
 /**
- * Turns screens on and off and reorders them.
- *
- * A [ScalingLazyColumn], not a plain scrolling Column: on a round display the
- * corners cut off anything full-width near the top and bottom edges. This is
- * the component that knows that — it centres the list, shrinks the items
- * approaching the rim, and pads for the curve, so every row is reachable and
- * readable. A hand-padded Column only ever approximates it.
+ * Turns screens on and off, reorders them, and picks the colour scheme.
  *
  * This screen is never in the layout it edits — the pager appends it last
  * unconditionally. A settings screen that can hide itself is a trap with no way
  * out short of clearing app data.
+ *
+ * [ScalingLazyColumn] rather than a scrolling Column: on a round screen a plain
+ * Column loses its first and last rows to the curve, and this list is now long
+ * enough for that to bite (docs/LESSONS.md #25).
  */
 @Composable
 fun SettingsScreen(
-    useCase: ScreenLayoutUseCase,
+    screenLayout: ScreenLayoutUseCase,
+    skins: SkinUseCase,
     modifier: Modifier = Modifier,
 ) {
-    val layout by useCase.state.collectAsStateWithLifecycle()
+    val layout by screenLayout.state.collectAsStateWithLifecycle()
+    val skin by skins.state.collectAsStateWithLifecycle()
 
     ScalingLazyColumn(
         modifier = modifier.fillMaxSize(),
-        // Bottom padding clears the pager's page-indicator dots, which float
-        // over this screen.
-        contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 22.dp, bottom = 44.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-        // autoCentering would centre the first item, leaving half a screen of
-        // black above a list this short. The rim scaling still applies, which
-        // is the part that matters on a round display.
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 30.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+        // The list is short and fixed; left on, auto-centering opens with half a
+        // screen of black above the first row.
         autoCentering = null,
     ) {
-        item {
-            Text("SCREENS", color = GymColors.Muted, fontSize = 10.sp, letterSpacing = 1.5.sp)
-        }
+        item { SectionLabel("SCREENS") }
 
         layout.order.forEachIndexed { index, screen ->
             item {
@@ -64,9 +63,9 @@ fun SettingsScreen(
                     visible = layout.isVisible(screen),
                     canMoveUp = index > 0,
                     canMoveDown = index < layout.order.lastIndex,
-                    onToggle = { useCase.toggle(screen) },
-                    onMoveUp = { useCase.move(screen, -1) },
-                    onMoveDown = { useCase.move(screen, 1) },
+                    onToggle = { screenLayout.toggle(screen) },
+                    onMoveUp = { screenLayout.move(screen, -1) },
+                    onMoveDown = { screenLayout.move(screen, 1) },
                 )
             }
         }
@@ -78,7 +77,66 @@ fun SettingsScreen(
                 fontSize = 9.sp,
             )
         }
+
+        item { SectionLabel("SKIN") }
+
+        Skin.entries.forEach { entry ->
+            item {
+                SkinRow(
+                    skin = entry,
+                    selected = entry == skin,
+                    onClick = { skins.select(entry) },
+                )
+            }
+        }
     }
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(text, color = GymColors.Muted, fontSize = 10.sp, letterSpacing = 1.5.sp)
+}
+
+/**
+ * The two dots are the skin's own chrono and rest colours, not the current
+ * theme's — the point of the row is to show what you are about to switch to.
+ */
+@Composable
+private fun SkinRow(skin: Skin, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp)
+            .background(
+                if (selected) GymColors.Surface else GymColors.Background,
+                RoundedCornerShape(percent = 50),
+            )
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp, horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Swatch(Color(skin.palette.chrono))
+        Swatch(Color(skin.palette.rest))
+
+        Text(
+            text = skin.title,
+            color = if (selected) GymColors.OnSurface else GymColors.Muted,
+            fontSize = 12.sp,
+            modifier = Modifier.weight(1f),
+        )
+
+        Text(
+            text = if (selected) "●" else "○",
+            color = if (selected) GymColors.Go else GymColors.Dim,
+            fontSize = 13.sp,
+        )
+    }
+}
+
+@Composable
+private fun Swatch(color: Color) {
+    Box(Modifier.size(11.dp).background(color, CircleShape))
 }
 
 @Composable
@@ -94,11 +152,12 @@ private fun ScreenRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(vertical = 2.dp)
             .background(
                 if (visible) GymColors.Surface else GymColors.Background,
                 RoundedCornerShape(percent = 50),
             )
-            .padding(vertical = 3.dp, horizontal = 6.dp),
+            .padding(vertical = 3.dp, horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         ArrowButton(glyph = "▲", enabled = canMoveUp, onClick = onMoveUp)
@@ -107,14 +166,14 @@ private fun ScreenRow(
             text = title,
             color = if (visible) GymColors.OnSurface else GymColors.Dim,
             fontSize = 12.sp,
-            modifier = Modifier.weight(1f).padding(horizontal = 2.dp),
+            modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
         )
 
         ArrowButton(glyph = "▼", enabled = canMoveDown, onClick = onMoveDown)
 
         Box(
             modifier = Modifier
-                .size(28.dp)
+                .size(30.dp)
                 .clickable(onClick = onToggle),
             contentAlignment = Alignment.Center,
         ) {

@@ -1,5 +1,6 @@
 package com.gymwatch.core.domain.port
 
+import com.gymwatch.core.domain.model.ExerciseKind
 import com.gymwatch.core.domain.model.Haptic
 
 fun interface HapticsPort {
@@ -23,12 +24,19 @@ interface OngoingActivityPort {
  * live metrics but persists nothing, Health Connect does not run on Wear OS, and
  * Samsung Health has no third-party write API. See docs/LESSONS.md #2.
  *
- * No package name appears here on purpose. Which app this is, and the fact that
- * only `getLaunchIntentForPackage` works to reach it, are adapter concerns.
+ * No package name or intent appears here on purpose. Which app this is, and the
+ * undocumented route into a specific exercise, are adapter concerns (#28).
  */
 interface CompanionHealthAppPort {
     suspend fun isAvailable(): Boolean
 
-    /** Returns false if the app is missing or refused to launch. */
+    /** Opens the app's home screen. Returns false if it is missing or refused. */
     suspend fun open(): Boolean
+
+    /**
+     * Opens the app on [kind]'s start screen, ready for the user to press start.
+     * Returns false when that route is unavailable, so the caller can fall back
+     * to [open].
+     */
+    suspend fun startWorkout(kind: ExerciseKind): Boolean
 }

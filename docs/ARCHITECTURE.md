@@ -32,10 +32,10 @@ the JVM with no emulator, no device, and no Robolectric.
 
 | Module | Type | Contains |
 |---|---|---|
-| `:core:domain` | kotlin-jvm | `Chronometer`, `RestTimer`, `RestPresets`, `Counter`, `WorkoutProfile`/`Profiles`, `ScreenLayout`, `ExerciseKind`, `CounterLabel`; all port interfaces |
-| `:core:application` | kotlin-jvm | `ChronometerUseCase`, `RestTimerUseCase`, `CounterUseCase`, `ProfilesUseCase`, `ScreenLayoutUseCase` |
+| `:core:domain` | kotlin-jvm | `Chronometer`, `RestTimer`, `RestPresets`, `Counter`, `WorkoutSetup`, `ScreenLayout`, `Skin`/`Palette`, `ExerciseKind`, `ResetOutcome`; all port interfaces |
+| `:core:application` | kotlin-jvm | `ChronometerUseCase`, `RestTimerUseCase`, `CounterUseCase`, `WorkoutSetupUseCase`, `ScreenLayoutUseCase`, `SkinUseCase` |
 | `:adapters:driven:persistence` | android-lib | DataStore implementations of the repository ports |
-| `:adapters:driven:platform` | android-lib | `ClockPort`, `HapticsPort`, `OngoingActivityPort`, `CompanionHealthAppPort` |
+| `:adapters:driven:platform` | android-lib | `ClockPort`, `HapticsPort`, `OngoingActivityPort`, `CompanionHealthAppPort`; `SamsungHealthIcons` |
 | `:adapters:driving:ui-compose` | android-lib | Screens |
 | `:adapters:driving:service` | android-lib | Timer foreground service |
 | `:app` | android-app | Composition root, manifest, permissions |
@@ -43,7 +43,7 @@ the JVM with no emulator, no device, and no Robolectric.
 
 ## Ports
 
-**Driving** (called by the UI): the five use cases in `:core:application`.
+**Driving** (called by the UI): the six use cases in `:core:application`.
 
 **Driven** (implemented by adapters), in `com.gymwatch.core.domain.port`:
 
@@ -51,14 +51,20 @@ the JVM with no emulator, no device, and no Robolectric.
 |---|---|---|
 | `ClockPort` | `SystemClock.elapsedRealtime()` | Monotonic. Never a wall clock. |
 | `CounterRepositoryPort` | DataStore | |
-| `ProfilesRepositoryPort` | DataStore | The three profiles and their rest lengths. Configured lengths only, never a running countdown |
+| `WorkoutSetupRepositoryPort` | DataStore | The three workout shortcuts and the rest lengths. Configured lengths only, never a running countdown |
 | `ScreenLayoutRepositoryPort` | DataStore | Which screens are shown, and in what order |
-| `CompanionHealthAppPort` | `PackageManager` | Opens Samsung Health, which owns the workout record. Names no package — that is the adapter's business |
+| `SkinRepositoryPort` | DataStore | The selected colour scheme, stored by enum name |
+| `CompanionHealthAppPort` | `PackageManager`, `startActivity` | Opens Samsung Health, which owns the workout record — on an exercise's start screen, or its home screen. Names no package and no intent; that is the adapter's business (`docs/LESSONS.md` #28) |
 | `HapticsPort` | `Vibrator` | |
 | `OngoingActivityPort` | `androidx.wear.ongoing` | |
 
 `port/` holds interfaces only. Value types such as `Haptic` and
-`CounterLabel` live in `model/`, and `ArchitectureTest` enforces that.
+`ResetOutcome` live in `model/`, and `ArchitectureTest` enforces that.
+
+Exercise icons are not a port. They are pure presentation, so the UI module
+declares a `WorkoutIcons` function interface and the composition root hands it
+`SamsungHealthIcons::bitmap` — the driving adapter never depends on the driven
+one, and the core never hears about icons at all.
 
 ## The one design decision everything else rests on
 
@@ -75,6 +81,9 @@ running for the value to stay correct, so the screen can sleep, the process can
 be killed, and doze can do whatever it likes. A tick loop would drift, stall, or
 need waking — and would be far harder to test.
 
+The rest alarm follows the same rule: the start mark is kept past zero until the
+user resets, so "is it ringing?" is also a question for the clock.
+
 The same property makes the domain trivially testable: pass a `FakeClock`,
 advance it by 45 minutes instantly, assert. See `ChronometerTest`.
 
@@ -89,7 +98,8 @@ and the object graph here is small enough to read on one screen.
 - **A new UI surface** (tile, complication, a different face): new module under
   `adapters/driving/`, depending on `:core:application`. The core does not change.
 - **A different watch's health app:** new implementation of
-  `CompanionHealthAppPort`. Swap it in `AppContainer`. The package name lives in
+  `CompanionHealthAppPort`, plus its own name and icon mapping for
+  `ExerciseKind`. Swap it in `AppContainer`. The package name and intents live in
   the adapter, so nothing else moves.
 - **A new domain rule:** it belongs on the entity, with a test in
   `:core:domain`, not in a ViewModel.
@@ -103,4 +113,5 @@ the user actually reads. Worse, the platform allows one exercise device-wide, so
 tracking ours *ended* Samsung Health's.
 
 Samsung Health records; this app owns the rest timer, the counter and the
-chronometer, and a profile configures them per workout. See `docs/LESSONS.md` #2.
+chronometer, and its three shortcuts open Samsung Health on the exercise you are
+about to do. See `docs/LESSONS.md` #2 and #28.

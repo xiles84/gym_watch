@@ -8,7 +8,7 @@ import kotlin.time.Duration.Companion.seconds
  * The three rest lengths offered on the rest screen, one tap each.
  *
  * Three, because that is what fits as thumb-sized targets on a round screen
- * without scrolling — the same reasoning that caps [Profiles].
+ * without scrolling — the same reasoning that caps [WorkoutSetup.SHORTCUT_COUNT].
  *
  * Every duration is clamped to [RestTimer]'s own bounds on the way in, so a
  * preset can never hold a value the timer would refuse to run.

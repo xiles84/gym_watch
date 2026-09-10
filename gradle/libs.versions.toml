@@ -24,11 +24,15 @@ wearOngoing = "1.1.0"
 wearToolingPreview = "1.0.0"
 coreKtx = "1.19.0"
 
+# JVM unit tests inside Android modules (AGP runs them on JUnit 4).
+junit = "4.13.2"
+
 [libraries]
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 konsist = { module = "com.lemonappdev:konsist", version.ref = "konsist" }
+junit = { module = "junit:junit", version.ref = "junit" }
 
 androidx-compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
 androidx-wear-compose-material3 = { module = "androidx.wear.compose:compose-material3", version.ref = "wearCompose" }

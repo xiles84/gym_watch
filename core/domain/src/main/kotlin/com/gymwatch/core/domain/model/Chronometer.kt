@@ -23,6 +23,12 @@ data class Chronometer(
     val isReset: Boolean
         get() = startMark == null && accumulated == Duration.ZERO && laps.isEmpty()
 
+    /**
+     * Only a running chronometer asks before resetting — that is a set being
+     * timed. A paused one was stopped on purpose.
+     */
+    val needsResetConfirmation: Boolean get() = isRunning
+
     /** Total elapsed time as of [now]. */
     fun elapsedAt(now: Duration): Duration =
         accumulated + (startMark?.let { now - it } ?: Duration.ZERO)

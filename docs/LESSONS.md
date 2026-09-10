@@ -51,10 +51,11 @@ persists nothing.
 3. **Samsung Health has no third-party write API.** Integration is curated
    partnerships (Strava, Technogym). There is nothing to call.
 
-And there is still no deep link into a specific exercise — community attempts at
-`health://` and similar URI schemes do not work. Only
-`getLaunchIntentForPackage("com.samsung.android.wear.shealth")` is documented,
-and it lands on the app's home screen.
+There is no *documented* way into a specific exercise, and community attempts
+at `health://` and similar URI schemes do not work. There is an undocumented
+one, though — the intent Samsung Health's own watch-face complication sends —
+found on 2026-09-10 by reading the APK (#28). Opening an exercise's start screen
+is still not recording it: the user presses start, and Samsung Health records.
 
 **Worse than useless:** the platform allows one exercise device-wide (#3). If
 Samsung Health was recording and the user tapped a workout in our app, our
@@ -67,6 +68,9 @@ record; `CompanionHealthAppPort` just opens it. The three slots became
 counter label. `:adapters:driven:health` was deleted, and with it the health
 foreground-service type (#19), the heart-rate permission split (#5) and the
 `RestrictedApi` suppressions (#21).
+
+Since 2026-09-10 the profiles are gone as well: one set of rest presets, and the
+three slots are shortcuts that open Samsung Health *on that exercise* (#28).
 
 **Avoid it by:** asking "what persists this, and who can read it?" *before*
 building on a platform API. A streaming API and a recording API are not the same
@@ -588,3 +592,99 @@ re-fire for the same screen twice.
 **Avoid it by:** treating `onCreate`-only intent reads as a bug whenever the
 Activity can be reached while already running — which is any launcher Activity
 with a notification or tile pointing at it.
+
+---
+
+## 27 — The watch holds the *release* build; the debug APK will not install over it
+*2026-09-09 · tooling · found on device*
+
+**Symptom:** the runbook's install line failed outright:
+
+```
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+Failure [INSTALL_FAILED_UPDATE_INCOMPATIBLE: Existing package com.gymwatch
+signatures do not match newer version; ignoring!]
+```
+
+**Cause:** what is on the watch was installed from `app-release.apk`, signed
+with the release keystore. The debug APK is signed with the local debug key, and
+Android refuses to replace a package with one signed by a different key. Nothing
+about the build was wrong — the two APKs simply cannot overwrite each other.
+
+**Fix:** install the release APK, which `./gradlew build` has already produced:
+
+```bash
+./gradlew build
+adb install -r app/build/outputs/apk/release/app-release.apk
+```
+
+**Do not reach for `adb uninstall` first.** It works, and it silently deletes
+the DataStore — the profiles, rest presets, screen layout and skin the watch has
+been configured with. Reinstalling the matching variant keeps all of it, which
+also makes "did the setting survive a reinstall?" a thing you can actually
+check.
+
+**Avoid it by:** matching the variant already installed rather than defaulting
+to debug. `adb shell dumpsys package com.gymwatch | grep versionName` confirms
+something is installed; the signature is only discovered by trying.
+
+---
+
+## 28 — Samsung Health *can* be opened on a specific exercise; read the APK, not the forums
+*2026-09-10 · platform · found by reading Samsung Health 7.00.0.131*
+
+**Symptom:** the user wanted three buttons that open one workout in Samsung
+Health, "like the complication on my watch face". Lesson #2 and every forum
+thread said only the home screen was reachable.
+
+**Cause:** the claim was never checked against the thing that plainly did it.
+Samsung Health's own complication opens a specific exercise, so *some* intent
+does; the only question was whether a third party may send it. It may:
+
+- `…/.app.exercise.view.ExerciseActivity` is `exported="true"` with no
+  permission and handles
+  `com.samsung.android.wear.shealth.intent.action.START_WORKOUT`;
+- its intent check reads a String extra `exercise.type` and passes it to
+  `Exercise.ExerciseType.valueOf`, so the value is the enum *name*
+  (`WEIGHT_MACHINE`, `TREADMILL`);
+- `StartExerciseBaseComplicationProviderService` builds exactly that, with
+  `NEW_TASK|CLEAR_TASK` and two complication-only extras we do not need.
+
+Verified with `am start` from the shell, a different uid with no special access:
+Weight machines, Treadmill and Bench press each opened on their start screen with
+the play button showing, and nothing started by itself. A SOCCER capture came
+back black twice with the screen awake — probably a location or secure screen on
+an outdoor type. Not investigated.
+
+**Fix:** `SamsungHealthLauncher.startWorkout` sends that intent. If the Activity
+stops resolving after an update, `WorkoutSetupUseCase` falls back to the home
+screen. Icons are Samsung Health's `b_exercise_*_icon` drawables, looked up by
+name in its resources at runtime and never bundled; they are white glyphs, so
+they tint to the skin. Samsung's spellings, typos included (`treadmil`,
+`horseback_riging`, `ICE_HOCKING`), are pinned by `SamsungExercisesTest` against
+a snapshot of the real names.
+
+An unused second route exists: exported `ExerciseListActivity`, action
+`…EXERCISE_ACTIVITY_TYPES_WIDGET`, String extra `key_string_extra` holding the
+numeric code (weight machine `15002`, treadmill `15005`). Try it if the first
+one breaks.
+
+**The method:**
+
+```bash
+adb shell pm path com.samsung.android.wear.shealth       # then adb pull the base.apk
+aapt2 dump xmltree base.apk --file AndroidManifest.xml   # exported? permission? actions
+aapt2 dump resources base.apk                            # drawable and string names
+dexdump -d classes3.dex > classes3.txt                   # then awk out whole methods
+```
+
+Three traps cost attempts. `dexdump` prints large constants such as resource ids
+in hex, in a trailing comment (`// #7f0801d8`), so searching for the decimal id
+finds nothing. An enum's `<clinit>` loads each value's ordinal and code *before*
+its name, so pairing a name with the numbers after it is off by one. And the
+watch's Wi-Fi adb port changes on every reconnect — `adb mdns services` shows the
+live one; a port written in the runbook goes stale.
+
+**Avoid it by:** when a first-party surface does something, read its intent
+before accepting "impossible". The APK is on the device and the tools ship with
+the SDK.

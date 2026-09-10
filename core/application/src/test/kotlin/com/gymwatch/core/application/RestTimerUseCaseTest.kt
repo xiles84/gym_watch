@@ -1,14 +1,14 @@
 package com.gymwatch.core.application
 
-import com.gymwatch.core.application.fake.InMemoryProfilesRepository
+import com.gymwatch.core.application.fake.InMemoryWorkoutSetupRepository
 import com.gymwatch.core.application.fake.RecordingHaptics
 import com.gymwatch.core.application.fake.SchedulerClock
 import com.gymwatch.core.domain.model.Haptic
-import com.gymwatch.core.domain.model.Profiles
+import com.gymwatch.core.domain.model.ResetOutcome
 import com.gymwatch.core.domain.model.RestPresets
-import com.gymwatch.core.domain.model.WorkoutProfile
-import com.gymwatch.core.domain.model.ExerciseKind
+import com.gymwatch.core.domain.model.WorkoutSetup
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -22,78 +22,104 @@ import kotlin.time.Duration.Companion.seconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class RestTimerUseCaseTest {
 
-    private fun profilesOf(vararg presets: Int) = InMemoryProfilesRepository(
-        Profiles(
-            listOf(
-                WorkoutProfile(
-                    kind = ExerciseKind.WEIGHTS,
-                    restPresets = RestPresets.of(presets.map { it.seconds }),
-                ),
-                Profiles.DEFAULT.entries[1],
-                Profiles.DEFAULT.entries[2],
-            ),
-        ),
+    private fun setupOf(vararg presets: Int) = InMemoryWorkoutSetupRepository(
+        WorkoutSetup.DEFAULT.copy(restPresets = RestPresets.of(presets.map { it.seconds })),
     )
 
+    private fun TestScope.restTimer(
+        haptics: RecordingHaptics = RecordingHaptics(),
+        setup: InMemoryWorkoutSetupRepository = setupOf(30, 60, 120),
+    ) = RestTimerUseCase(SchedulerClock(testScheduler), setup, haptics, backgroundScope)
+
+    private val RecordingHaptics.buzzes get() = played.count { it == Haptic.REST_OVER }
+
     @Test
-    fun `fires exactly once when the countdown reaches zero`() = runTest {
+    fun `the alarm starts at zero, not before`() = runTest {
         val haptics = RecordingHaptics()
-        val useCase = RestTimerUseCase(
-            clock = SchedulerClock(testScheduler),
-            profiles = profilesOf(30, 60, 120),
-            haptics = haptics,
-            scope = backgroundScope,
-        )
+        val useCase = restTimer(haptics)
         runCurrent()
 
         useCase.start(index = 1)
         runCurrent()
         advanceTimeBy(59.seconds); runCurrent()
-        assertTrue(haptics.played.isEmpty(), "must not fire early")
+        assertEquals(0, haptics.buzzes, "must not fire early")
+        assertFalse(useCase.alarming.value)
+        assertFalse(useCase.isAlarmingNow())
+        assertTrue(useCase.needsResetConfirmationNow())
 
         advanceTimeBy(2.seconds); runCurrent()
-        assertEquals(listOf(Haptic.REST_OVER), haptics.played)
-        assertFalse(useCase.state.value.isRunning, "timer returns to idle after firing")
+        assertEquals(1, haptics.buzzes)
+        assertTrue(useCase.alarming.value)
+        assertTrue(useCase.isAlarmingNow())
+        assertFalse(useCase.needsResetConfirmationNow())
+        assertTrue(useCase.state.value.isRunning, "it stays on the alarm rather than going idle")
     }
 
     @Test
-    fun `a long doze past the deadline still fires only once`() = runTest {
+    fun `the alarm repeats until reset, and reset needs no confirmation`() = runTest {
         val haptics = RecordingHaptics()
-        val useCase = RestTimerUseCase(
-            SchedulerClock(testScheduler), profilesOf(30, 60, 120), haptics, backgroundScope,
-        )
+        val useCase = restTimer(haptics)
         runCurrent()
 
         useCase.start(index = 0)
         runCurrent()
-        advanceTimeBy(20.minutes); runCurrent()
+        advanceTimeBy(31.seconds); runCurrent()
+        advanceTimeBy(RestTimerUseCase.ALARM_REPEAT); runCurrent()
+        advanceTimeBy(RestTimerUseCase.ALARM_REPEAT); runCurrent()
+        assertEquals(3, haptics.buzzes)
 
-        assertEquals(1, haptics.played.count { it == Haptic.REST_OVER })
+        assertEquals(ResetOutcome.DONE, useCase.requestReset())
+        advanceTimeBy(5.minutes); runCurrent()
+
+        assertEquals(3, haptics.buzzes, "reset silences it")
+        assertFalse(useCase.alarming.value)
+        assertFalse(useCase.state.value.isRunning)
     }
 
     @Test
-    fun `cancelling before the deadline never fires`() = runTest {
+    fun `resetting mid-countdown asks first and the countdown carries on`() = runTest {
         val haptics = RecordingHaptics()
-        val useCase = RestTimerUseCase(
-            SchedulerClock(testScheduler), profilesOf(30, 60, 120), haptics, backgroundScope,
-        )
+        val useCase = restTimer(haptics)
+        runCurrent()
+
+        useCase.start(index = 0)
+        runCurrent()
+        advanceTimeBy(10.seconds); runCurrent()
+
+        assertEquals(ResetOutcome.NEEDS_CONFIRMATION, useCase.requestReset())
+        assertTrue(useCase.state.value.isRunning)
+
+        advanceTimeBy(21.seconds); runCurrent()
+        assertEquals(1, haptics.buzzes, "an unconfirmed reset does not stop the alarm")
+    }
+
+    @Test
+    fun `a confirmed reset before zero never rings`() = runTest {
+        val haptics = RecordingHaptics()
+        val useCase = restTimer(haptics)
         runCurrent()
 
         useCase.start(index = 1)
         runCurrent()
         advanceTimeBy(30.seconds); runCurrent()
-        useCase.cancel()
+        useCase.confirmReset()
         advanceTimeBy(5.minutes); runCurrent()
 
-        assertTrue(haptics.played.none { it == Haptic.REST_OVER })
+        assertEquals(0, haptics.buzzes)
+        assertFalse(useCase.alarming.value)
+    }
+
+    @Test
+    fun `resetting an idle timer is done at once`() = runTest {
+        val useCase = restTimer()
+        runCurrent()
+
+        assertEquals(ResetOutcome.DONE, useCase.requestReset())
     }
 
     @Test
     fun `each preset starts its own length`() = runTest {
-        val useCase = RestTimerUseCase(
-            SchedulerClock(testScheduler), profilesOf(30, 90, 120),
-            RecordingHaptics(), backgroundScope,
-        )
+        val useCase = restTimer(setup = setupOf(30, 90, 120))
         runCurrent()
 
         useCase.start(index = 1)
@@ -104,19 +130,18 @@ class RestTimerUseCaseTest {
     }
 
     @Test
-    fun `presets follow the active profile`() = runTest {
-        val repository = InMemoryProfilesRepository()
-        val useCase = RestTimerUseCase(
-            SchedulerClock(testScheduler), repository, RecordingHaptics(), backgroundScope,
-        )
+    fun `presets follow the stored setup`() = runTest {
+        val repository = InMemoryWorkoutSetupRepository()
+        val useCase = restTimer(setup = repository)
         runCurrent()
 
-        assertEquals(Profiles.DEFAULT.entries[0].restPresets, useCase.presets.value)
+        assertEquals(WorkoutSetup.DEFAULT.restPresets, useCase.presets.value)
 
-        repository.save(Profiles.DEFAULT.select(1))
+        val changed = WorkoutSetup.DEFAULT.withRestPresetAt(0, 45.seconds)
+        repository.save(changed)
         runCurrent()
 
-        assertEquals(Profiles.DEFAULT.entries[1].restPresets, useCase.presets.value)
+        assertEquals(changed.restPresets, useCase.presets.value)
     }
 
     @Test
@@ -124,10 +149,7 @@ class RestTimerUseCaseTest {
         // The seeded StateFlow default is RestPresets.DEFAULT (60/90/120). A tap
         // landing before the first stored emission must still use the stored
         // 45s value. See docs/LESSONS.md #10.
-        val useCase = RestTimerUseCase(
-            SchedulerClock(testScheduler), profilesOf(45, 90, 120),
-            RecordingHaptics(), backgroundScope,
-        )
+        val useCase = restTimer(setup = setupOf(45, 90, 120))
 
         useCase.start(index = 0)
         runCurrent()

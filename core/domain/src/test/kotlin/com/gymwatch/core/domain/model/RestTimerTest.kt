@@ -36,6 +36,36 @@ class RestTimerTest {
     }
 
     @Test
+    fun `a countdown in progress asks before resetting`() {
+        val timer = RestTimer(duration = 30.seconds).start(0.seconds)
+
+        assertTrue(timer.needsResetConfirmationAt(10.seconds))
+        assertFalse(timer.isAlarmingAt(10.seconds))
+    }
+
+    @Test
+    fun `at zero it alarms and resets without asking`() {
+        val timer = RestTimer(duration = 30.seconds).start(0.seconds)
+
+        assertTrue(timer.isAlarmingAt(30.seconds))
+        assertFalse(timer.needsResetConfirmationAt(30.seconds))
+        // Still ringing long after: the alarm is derived from the clock, so a
+        // screen that slept through zero wakes up to it.
+        assertTrue(timer.isAlarmingAt(20.minutes))
+    }
+
+    @Test
+    fun `an idle or cancelled timer neither alarms nor asks`() {
+        val idle = RestTimer(duration = 30.seconds)
+        val cancelled = idle.start(0.seconds).cancel()
+
+        listOf(idle, cancelled).forEach {
+            assertFalse(it.isAlarmingAt(5.minutes))
+            assertFalse(it.needsResetConfirmationAt(5.minutes))
+        }
+    }
+
+    @Test
     fun `progress runs from one down to zero`() {
         val timer = RestTimer(duration = 60.seconds).start(0.seconds)
         assertEquals(1f, timer.progressAt(0.seconds))

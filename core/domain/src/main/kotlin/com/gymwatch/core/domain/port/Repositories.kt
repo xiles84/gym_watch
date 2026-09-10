@@ -1,8 +1,9 @@
 package com.gymwatch.core.domain.port
 
 import com.gymwatch.core.domain.model.Counter
-import com.gymwatch.core.domain.model.Profiles
 import com.gymwatch.core.domain.model.ScreenLayout
+import com.gymwatch.core.domain.model.Skin
+import com.gymwatch.core.domain.model.WorkoutSetup
 import kotlinx.coroutines.flow.Flow
 
 interface CounterRepositoryPort {
@@ -11,20 +12,23 @@ interface CounterRepositoryPort {
 }
 
 /**
- * The three profiles and the active one.
+ * The three workout shortcuts and the rest presets.
  *
- * Rest lengths live in here rather than in a settings port of their own,
- * because they belong to a profile: the rest you take between heavy sets is not
- * the rest you take between intervals. Only the *configured* lengths are
- * persisted, never a running countdown — restoring one after a reboot would
- * show a deadline that no longer means anything.
+ * Only the *configured* rest lengths are persisted, never a running countdown —
+ * restoring one after a reboot would show a deadline that no longer means
+ * anything.
  */
-interface ProfilesRepositoryPort {
-    val profiles: Flow<Profiles>
-    suspend fun save(profiles: Profiles)
+interface WorkoutSetupRepositoryPort {
+    val setup: Flow<WorkoutSetup>
+    suspend fun save(setup: WorkoutSetup)
 }
 
 interface ScreenLayoutRepositoryPort {
     val layout: Flow<ScreenLayout>
     suspend fun save(layout: ScreenLayout)
+}
+
+interface SkinRepositoryPort {
+    val skin: Flow<Skin>
+    suspend fun save(skin: Skin)
 }

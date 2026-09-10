@@ -10,8 +10,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 /**
- * Only the count is stored. What it is called comes from the active profile,
- * so there is nothing to persist for the label.
+ * Only the count is stored. The counter always counts sets, so there is no
+ * label to persist.
  */
 internal class DataStoreCounterRepository(
     private val dataStore: DataStore<Preferences>,

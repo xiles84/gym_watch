@@ -85,6 +85,15 @@ class ChronometerTest {
     }
 
     @Test
+    fun `only a running chronometer asks before resetting`() {
+        val running = Chronometer.Idle.start(0.seconds)
+
+        assertTrue(running.needsResetConfirmation)
+        assertFalse(running.pause(10.seconds).needsResetConfirmation, "paused on purpose")
+        assertFalse(Chronometer.Idle.needsResetConfirmation)
+    }
+
+    @Test
     fun `toggle flips between running and paused`() {
         val running = Chronometer.Idle.toggle(0.seconds)
         assertTrue(running.isRunning)

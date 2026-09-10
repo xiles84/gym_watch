@@ -20,13 +20,15 @@ import androidx.wear.compose.material3.Text
 import com.gymwatch.core.application.CounterUseCase
 
 /**
- * @param label what is being counted — supplied by the active profile, so
- *   switching from weights to a run relabels this without touching the count.
+ * How many sets of the current machine are done.
+ *
+ * Always "SETS". Moving to the next machine, you hold the number to zero it and
+ * tap + after each set; when distracted, one glance says where you are. A label
+ * to choose bought nothing in that workflow, so there isn't one.
  */
 @Composable
 fun CounterScreen(
     useCase: CounterUseCase,
-    label: String,
     modifier: Modifier = Modifier,
 ) {
     val counter by useCase.state.collectAsStateWithLifecycle()
@@ -40,7 +42,7 @@ fun CounterScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Text(label, color = GymColors.Muted, fontSize = 10.sp, letterSpacing = 1.5.sp)
+        Text("SETS", color = GymColors.Muted, fontSize = 10.sp, letterSpacing = 1.5.sp)
 
         Spacer(Modifier.height(4.dp))
 

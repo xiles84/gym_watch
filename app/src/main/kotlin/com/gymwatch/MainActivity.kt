@@ -14,6 +14,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.gymwatch.adapters.driving.service.GymSessionService
 import com.gymwatch.adapters.driving.ui.GymApp
+import com.gymwatch.adapters.driving.ui.WorkoutIcons
 import com.gymwatch.core.domain.model.AppScreen
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
@@ -56,8 +57,10 @@ class MainActivity : ComponentActivity() {
                 chronometer = container.chronometer,
                 restTimer = container.restTimer,
                 counter = container.counter,
-                profiles = container.profiles,
+                workouts = container.workouts,
+                workoutIcons = WorkoutIcons(container.workoutIcons::bitmap),
                 screenLayout = container.screenLayout,
+                skins = container.skins,
                 requestedScreen = pendingScreen,
                 onScreenHandled = { pendingScreen = null },
             )
@@ -76,8 +79,7 @@ class MainActivity : ComponentActivity() {
      * current layout, and an unknown or hidden one falls back to the first page.
      */
     private fun screenFrom(intent: Intent?): AppScreen? =
-        intent?.getStringExtra(EXTRA_SCREEN)
-            ?.let { name -> AppScreen.entries.firstOrNull { it.name == name } }
+        AppScreen.of(intent?.getStringExtra(EXTRA_SCREEN))
 
     private fun requestNotificationPermissionIfNeeded() {
         val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
@@ -91,15 +93,26 @@ class MainActivity : ComponentActivity() {
      * face indicator appears and disappears on its own. Driven from the use case
      * state rather than from button handlers, so it cannot drift out of sync
      * with what is actually happening.
+     *
+     * The rest alarm counts as running: it keeps the process alive to buzz, and
+     * the indicator says so.
      */
     private fun observeTimerState() {
         lifecycleScope.launch {
             combine(
                 container.chronometer.state,
                 container.restTimer.state,
-            ) { chrono, rest -> chrono.isRunning to rest.isRunning }
-                .collect { (chronoRunning, restRunning) ->
+                container.restTimer.alarming,
+            ) { chrono, rest, alarming -> Triple(chrono.isRunning, rest.isRunning, alarming) }
+                .collect { (chronoRunning, restRunning, restAlarming) ->
                     when {
+                        restAlarming -> GymSessionService.start(
+                            this@MainActivity,
+                            title = "Rest",
+                            status = "Rest over",
+                            launchIntent = selfIntent(),
+                        )
+
                         restRunning -> GymSessionService.start(
                             this@MainActivity,
                             title = "Rest",

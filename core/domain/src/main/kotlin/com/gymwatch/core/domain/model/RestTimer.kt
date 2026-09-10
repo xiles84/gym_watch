@@ -24,6 +24,16 @@ data class RestTimer(
 
     fun hasExpiredAt(now: Duration): Boolean = isRunning && remainingAt(now) == Duration.ZERO
 
+    /**
+     * Ringing: the countdown reached zero and has not been reset. The start mark
+     * is kept until then on purpose, so the alarm is derived from the clock like
+     * the countdown and survives the screen going off.
+     */
+    fun isAlarmingAt(now: Duration): Boolean = hasExpiredAt(now)
+
+    /** Asks only mid-countdown. At zero, resetting is how the alarm is silenced. */
+    fun needsResetConfirmationAt(now: Duration): Boolean = isRunning && !hasExpiredAt(now)
+
     /** Fraction still to run, 1.0 down to 0.0 — for the progress ring. */
     fun progressAt(now: Duration): Float =
         if (duration == Duration.ZERO) 0f

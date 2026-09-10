@@ -13,13 +13,6 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.VIBRATE" />
 
-    <!-- Samsung Health is opened by package name, the only supported way in.
-         Wear OS still requires the target to be declared to be visible to
-         PackageManager queries. -->
-    <queries>
-        <package android:name="com.samsung.android.wear.shealth" />
-    </queries>
-
     <application
         android:name=".GymApplication"
         android:icon="@mipmap/ic_launcher"

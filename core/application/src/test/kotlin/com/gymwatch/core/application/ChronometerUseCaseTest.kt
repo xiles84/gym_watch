@@ -2,6 +2,7 @@ package com.gymwatch.core.application
 
 import com.gymwatch.core.application.fake.FakeClock
 import com.gymwatch.core.application.fake.RecordingHaptics
+import com.gymwatch.core.domain.model.ResetOutcome
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -52,10 +53,34 @@ class ChronometerUseCaseTest {
     }
 
     @Test
-    fun `reset returns to idle`() {
+    fun `resetting a running chronometer asks first and changes nothing`() {
         useCase.toggle()
         clock.advance(1.minutes)
-        useCase.reset()
+        haptics.played.clear()
+
+        assertEquals(ResetOutcome.NEEDS_CONFIRMATION, useCase.requestReset())
+        assertTrue(useCase.state.value.isRunning)
+        assertEquals(1.minutes, useCase.elapsedNow())
+        assertTrue(haptics.played.isEmpty(), "no feedback until the user confirms")
+    }
+
+    @Test
+    fun `resetting a paused chronometer happens at once`() {
+        useCase.toggle()
+        clock.advance(1.minutes)
+        useCase.toggle()
+
+        assertEquals(ResetOutcome.DONE, useCase.requestReset())
+        assertTrue(useCase.state.value.isReset)
+    }
+
+    @Test
+    fun `confirming a reset clears a running chronometer`() {
+        useCase.toggle()
+        clock.advance(1.minutes)
+
+        useCase.confirmReset()
+
         assertTrue(useCase.state.value.isReset)
         assertEquals(kotlin.time.Duration.ZERO, useCase.elapsedNow())
     }

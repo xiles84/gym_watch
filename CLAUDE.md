@@ -1,8 +1,9 @@
 # Gym Watch — working agreement
 
 A Wear OS app for a Samsung Galaxy Watch, used at the gym: chronometer, a rest
-timer with three one-tap presets, a set counter, and three workout profiles.
-Screens can be reordered or turned off.
+timer with three one-tap presets and an alarm at zero, a set counter, and three
+workout shortcuts that open Samsung Health on that exercise. Screens can be
+reordered or turned off.
 
 **Read `docs/LESSONS.md` before doing anything non-trivial.** It exists so the
 same problem is not solved twice. Most of what looks like an arbitrary choice in
@@ -35,7 +36,9 @@ If a lesson turns out to be wrong, correct it in place — do not leave both.
    watch app cannot write one: `ExerciseClient` persists nothing, Health Connect
    does not run on Wear OS, and Samsung Health has no write API. Tracking our own
    exercise also *ended* Samsung Health's, because the platform allows one
-   device-wide. Do not reintroduce this. See lesson 2.
+   device-wide. Do not reintroduce this. See lesson 2. What we *can* do is open
+   Samsung Health on a specific exercise's start screen, through the
+   undocumented intent its own complication uses — see lesson 28.
 5. **The watch has no rotating bezel.** SM-L705F is a Galaxy Watch **Ultra**;
    its bezel is static. Every value must be settable by touch. Rotary support is
    additive only, never the sole way to do anything. See lesson 24.
@@ -61,6 +64,7 @@ requires editing `:core` to add a UI, the design has gone wrong.
 
 ```bash
 ./gradlew :core:domain:test :core:application:test   # pure JVM, no device needed
+./gradlew :adapters:driven:platform:testDebugUnitTest # Samsung Health name mapping
 ./gradlew build
 ```
 
