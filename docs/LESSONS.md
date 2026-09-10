@@ -569,7 +569,7 @@ the device, and reaching for the Wear component before the generic Compose one.
 ---
 
 ## 26 — A running Activity only sees a new intent if it is `singleTop`
-*2026-09-09 · correctness · found on device · corrected 2026-09-10*
+*2026-09-09 · correctness · found on device · corrected and verified 2026-09-10*
 
 **Symptom:** with the app already open,
 `am start -n com.gymwatch/.MainActivity --es screen REST_TIMER` printed
@@ -588,6 +588,12 @@ The console message is the trap: `recycleTask` returns `START_DELIVERED_TO_TOP`
 whenever the task was already in front, whether or not anything was delivered.
 It is not evidence that `onNewIntent` fired.
 
+The same launch mode also stacked copies. When the intent *does* differ from the
+task's root intent — a launcher tap versus `am start -n`, or the indicator's
+bare `Intent(this, MainActivity::class.java)` — Android puts a new `MainActivity`
+on top instead. The watch had ten in one task
+(`dumpsys activity activities | grep 'Hist .*MainActivity'`).
+
 The first version of this lesson blamed reading the extra only in `onCreate`,
 and fixed only that: the requested screen held in `mutableStateOf`, set from
 both `onCreate` and `onNewIntent` (calling `setIntent`), with a `LaunchedEffect`
@@ -605,13 +611,17 @@ indicator's intent carries no screen extra and just brings the app forward.)
 indicator, a future tile — without each one adding flags, and brings none of
 the `NEW_TASK`/`CLEAR_TOP` Recents trouble noted in `MainActivity`.
 
-On a build without the fix, `am start ... -f 0x20000000` (that is
-`FLAG_ACTIVITY_SINGLE_TOP`) forces the same delivery — a quick way to tell this
-cause from a Compose-side one without rebuilding.
+**Verified on the watch** (0.2.0 release). On the old build, adding
+`-f 0x20000000` (`FLAG_ACTIVITY_SINGLE_TOP`) by hand moved the pager where the
+plain `am start` did not. On the fixed build, a warm `--es screen COUNTER`, a
+launcher-shaped intent and a repeated request all moved the pager, logcat
+reported `LAUNCH_SINGLE_TOP`, and the task stayed at one instance.
 
 **Avoid it by:** declaring `singleTop` on any Activity a deep link can reach
 while it is running, and confirming `onNewIntent` with a log line or an
-on-screen change — never with `am start`'s console message.
+on-screen change — never with `am start`'s console message. When testing,
+request a page *other* than the one showing: asking for the current page leaves
+the screenshot unchanged whether or not the fix works.
 
 ---
 
@@ -719,11 +729,12 @@ the SDK.
 showed the real change.
 
 **Cause:** there is no `.gitattributes`, and `core.autocrlf=true` comes from Git
-for Windows' system gitconfig. The tree is split — 42 files are stored with
-CRLF, 48 with LF, and this file itself was CRLF up to #24 and LF after. Git
-leaves CRs alone on `git add` when the stored copy already has them, so the
-line endings a tool writes are the ones that get committed. `perl -pi`, or any
-tool that rewrites a whole file as LF, flips every line of a CRLF file.
+for Windows' system gitconfig. The tree is split — roughly half the files are
+stored with CRLF and half with LF, and until the 0.2.0 merge this file itself
+was CRLF up to #24 and LF after. Git leaves CRs alone on `git add` when the
+stored copy already has them, so the line endings a tool writes are the ones
+that get committed. `perl -pi`, or any tool that rewrites a whole file as LF,
+flips every line of a CRLF file.
 
 Two things hid it:
 
