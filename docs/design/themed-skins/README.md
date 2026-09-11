@@ -101,7 +101,7 @@ individual images.
 ### 2. Splitting the sheet into single images
 
 ```text
-please break this in circular individual images.
+please break this in 12 circular individual images.
 I am aware you will need more than one iteration.
 ```
 
