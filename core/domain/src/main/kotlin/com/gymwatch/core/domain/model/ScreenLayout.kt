@@ -11,6 +11,9 @@ enum class AppScreen(val title: String) {
     CHRONOMETER("Chrono"),
     REST_TIMER("Rest"),
     COUNTER("Counter"),
+
+    /** The rest timer and the counter on one page — the two you touch between sets. */
+    REST_AND_COUNTER("Rest + Sets"),
     WORKOUTS("Workouts");
 
     companion object {

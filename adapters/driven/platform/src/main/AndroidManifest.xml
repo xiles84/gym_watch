@@ -9,9 +9,22 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- The rest alarm must wake the watch at zero; a coroutine delay stalls in
+         deep sleep (docs/LESSONS.md #31). USE_EXACT_ALARM is granted at install
+         to timer apps, where SCHEDULE_EXACT_ALARM starts denied. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
     <!-- Samsung Health is opened, resolved and read for icons from this module.
          Package visibility has to be declared for any of that to see it. -->
     <queries>
         <package android:name="com.samsung.android.wear.shealth" />
     </queries>
+
+    <application>
+        <!-- Only ever sent by our own PendingIntent. -->
+        <receiver
+            android:name=".WakeUpReceiver"
+            android:exported="false" />
+    </application>
 </manifest>

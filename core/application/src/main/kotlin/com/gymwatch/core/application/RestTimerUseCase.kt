@@ -6,6 +6,7 @@ import com.gymwatch.core.domain.model.RestPresets
 import com.gymwatch.core.domain.model.RestTimer
 import com.gymwatch.core.domain.port.ClockPort
 import com.gymwatch.core.domain.port.HapticsPort
+import com.gymwatch.core.domain.port.WakeUpPort
 import com.gymwatch.core.domain.port.WorkoutSetupRepositoryPort
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -32,14 +33,18 @@ import kotlin.time.Duration.Companion.seconds
  * one buzz is easy to miss and the whole point is not to over-rest.
  *
  * The watchdog sleeps for exactly the remaining time and then re-checks against
- * the clock rather than counting down in fixed steps, so a long doze cannot make
- * the alarm start late. The repeat is a plain delay on purpose: after a doze it
- * carries on with one buzz rather than replaying every buzz it slept through.
+ * the clock rather than counting down in fixed steps. That alone is not enough
+ * with the screen off: `delay` stalls while the CPU is suspended, so zero is also
+ * booked with [WakeUpPort], which wakes the device and restarts the watchdog.
+ * While ringing the device is held awake, or the repeats would stall the same
+ * way (docs/LESSONS.md #31). The repeat is a plain delay on purpose: if it ever
+ * does stall, it carries on with one buzz rather than replaying every buzz missed.
  */
 class RestTimerUseCase(
     private val clock: ClockPort,
     private val setup: WorkoutSetupRepositoryPort,
     private val haptics: HapticsPort,
+    private val wakeUp: WakeUpPort,
     private val scope: CoroutineScope,
 ) {
     private val _state = MutableStateFlow(RestTimer())
@@ -91,6 +96,7 @@ class RestTimerUseCase(
     fun confirmStop() {
         watchdog?.cancel()
         watchdog = null
+        wakeUp.release()
         _alarming.value = false
         _state.update { it.cancel() }
     }
@@ -133,8 +139,25 @@ class RestTimerUseCase(
 
     /** Replaces whatever was running, alarm included, and watches [timer] instead. */
     private fun countDown(timer: RestTimer) {
+        watchdog?.cancel()
+        wakeUp.release()
         _alarming.value = false
         _state.value = timer
+        timer.zeroMark?.let { zero -> wakeUp.wakeAt(zero) { onWokenAtZero(timer) } }
+        watch()
+    }
+
+    /**
+     * The watchdog may still be parked in a `delay` that stopped counting while
+     * the CPU slept, so it is replaced rather than trusted. Ignored when [timer]
+     * has since been stopped or restarted, and when the watchdog got there first.
+     */
+    private fun onWokenAtZero(timer: RestTimer) {
+        if (_state.value != timer || _alarming.value) return
+        watch()
+    }
+
+    private fun watch() {
         watchdog?.cancel()
         watchdog = scope.launch {
             while (isActive) {
@@ -145,7 +168,10 @@ class RestTimerUseCase(
                     delay(remaining)
                     continue
                 }
-                _alarming.value = true
+                if (!_alarming.value) {
+                    _alarming.value = true
+                    wakeUp.stayAwake()
+                }
                 haptics.play(Haptic.REST_OVER)
                 delay(ALARM_REPEAT)
             }

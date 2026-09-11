@@ -20,6 +20,9 @@ internal enum class WallpaperSlot(val textRadius: Float) {
     REST_OVER(0.62f),
     COUNTER(0.62f),
 
+    // Two screens stacked: the counter's hint sits most of the way to the rim.
+    REST_AND_COUNTER(0.85f),
+
     // The outer shortcuts' names reach most of the way to the rim.
     WORKOUTS(1f),
     SETTINGS(1f),
@@ -30,7 +33,7 @@ internal enum class WallpaperSlot(val textRadius: Float) {
 /**
  * One themed skin's pictures.
  *
- * Six surfaces must have their own. The other three borrow their parent's until
+ * Six surfaces must have their own. The other four borrow their parent's until
  * a picture is drawn for them, which is why they are nullable: adding one later
  * is a resource from `scripts/wallpapers.ps1` and one argument here.
  */
@@ -42,6 +45,7 @@ internal class SkinArt(
     private val workouts: Int,
     private val settings: Int,
     private val restOver: Int? = null,
+    private val restAndCounter: Int? = null,
     private val restEditor: Int? = null,
     private val workoutPicker: Int? = null,
 ) {
@@ -52,6 +56,7 @@ internal class SkinArt(
         WallpaperSlot.REST_RUNNING -> restRunning
         WallpaperSlot.REST_OVER -> restOver ?: restRunning
         WallpaperSlot.COUNTER -> counter
+        WallpaperSlot.REST_AND_COUNTER -> restAndCounter ?: rest
         WallpaperSlot.WORKOUTS -> workouts
         WallpaperSlot.SETTINGS -> settings
         WallpaperSlot.REST_EDITOR -> restEditor ?: rest

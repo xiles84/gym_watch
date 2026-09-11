@@ -12,6 +12,7 @@ import com.gymwatch.core.domain.port.CounterRepositoryPort
 import com.gymwatch.core.domain.port.HapticsPort
 import com.gymwatch.core.domain.port.ScreenLayoutRepositoryPort
 import com.gymwatch.core.domain.port.SkinRepositoryPort
+import com.gymwatch.core.domain.port.WakeUpPort
 import com.gymwatch.core.domain.port.WorkoutSetupRepositoryPort
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,7 +33,42 @@ class FakeClock(var now: Duration = Duration.ZERO) : ClockPort {
  */
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class SchedulerClock(private val scheduler: TestCoroutineScheduler) : ClockPort {
-    override fun elapsed(): Duration = scheduler.currentTime.milliseconds
+    /** Time spent in deep sleep: the clock moved, pending `delay`s did not. */
+    private var slept = Duration.ZERO
+
+    override fun elapsed(): Duration = scheduler.currentTime.milliseconds + slept
+
+    fun deepSleep(duration: Duration) { slept += duration }
+}
+
+/** Holds the wake-up request so a test can fire it, as the alarm would. */
+class FakeWakeUp : WakeUpPort {
+    var pendingAt: Duration? = null
+        private set
+    private var onWake: (() -> Unit)? = null
+    var awake = false
+        private set
+
+    override fun wakeAt(at: Duration, onWake: () -> Unit) {
+        pendingAt = at
+        this.onWake = onWake
+    }
+
+    override fun stayAwake() { awake = true }
+
+    override fun release() {
+        pendingAt = null
+        onWake = null
+        awake = false
+    }
+
+    /** What the platform does at the booked time. A released request does nothing. */
+    fun fire() {
+        val callback = onWake ?: return
+        pendingAt = null
+        onWake = null
+        callback()
+    }
 }
 
 class RecordingHaptics : HapticsPort {

@@ -5,6 +5,7 @@ import android.content.Intent
 import com.gymwatch.adapters.driven.persistence.PersistenceAdapters
 import com.gymwatch.adapters.driven.platform.AndroidClock
 import com.gymwatch.adapters.driven.platform.AndroidHaptics
+import com.gymwatch.adapters.driven.platform.AndroidWakeUp
 import com.gymwatch.adapters.driven.platform.GymNotifications
 import com.gymwatch.adapters.driven.platform.OngoingActivityAdapter
 import com.gymwatch.adapters.driven.platform.SamsungHealthIcons
@@ -60,6 +61,7 @@ class AppContainer(private val context: Context) {
         clock = AndroidClock,
         setup = persistence.workoutSetup,
         haptics = haptics,
+        wakeUp = AndroidWakeUp(context),
         scope = scope,
     )
 

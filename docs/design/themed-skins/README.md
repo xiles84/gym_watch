@@ -128,7 +128,9 @@ margin and, on most, a painted dark bezel ring. That frame is expected —
    | `rest-editor.png` | Editing a rest preset | optional — uses `rest.png` |
    | `workout-picker.png` | Changing a workout shortcut | optional — uses `workouts.png` |
 
-   The confirm dialog never has a wallpaper.
+   The confirm dialog never has a wallpaper. The Rest + Sets screen always
+   borrows `rest.png`: `SkinArt` can take a picture of its own, but the script
+   has no `rest-and-counter` slot yet.
 
 2. Run `powershell -File scripts/wallpapers.ps1`. It finds the art circle, crops
    to it and writes 480×480 JPEGs to

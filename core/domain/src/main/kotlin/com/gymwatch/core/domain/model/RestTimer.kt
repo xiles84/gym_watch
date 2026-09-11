@@ -15,6 +15,9 @@ data class RestTimer(
 ) {
     val isRunning: Boolean get() = startMark != null
 
+    /** The clock reading at which it reaches zero; null when idle. */
+    val zeroMark: Duration? get() = startMark?.plus(duration)
+
     /** Never negative — it clamps at zero once expired. */
     fun remainingAt(now: Duration): Duration {
         val start = startMark ?: return duration

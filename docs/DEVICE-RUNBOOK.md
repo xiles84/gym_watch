@@ -84,8 +84,8 @@ adb -s <watch> shell am start -n com.gymwatch/.MainActivity \
   --es screen REST_TIMER
 ```
 
-Valid names: `CHRONOMETER`, `REST_TIMER`, `COUNTER`, `WORKOUTS`. `PROFILES`, the
-old name, still lands on the workouts screen. An unknown or hidden one falls back
+Valid names: `CHRONOMETER`, `REST_TIMER`, `COUNTER`, `REST_AND_COUNTER`,
+`WORKOUTS`. `PROFILES`, the old name, still lands on the workouts screen. An unknown or hidden one falls back
 to the first visible screen.
 
 ## Permissions
@@ -145,6 +145,14 @@ These are the ones that catch real regressions; automated tests cannot.
    it stays on REST OVER and buzzes every 3 s — *including with the screen
    covered* — until ■ or ↺, neither of which asks. ■ goes back to the presets;
    ↺ starts the same length again from full.
+7. **The alarm is on time with the screen off.** Start a 1:00 rest, let the
+   screen go off, keep the wrist still. The first buzz must come at 1:00, not
+   when the wrist is next raised (`docs/LESSONS.md` #31). Pending alarm:
+   `adb shell dumpsys alarm | grep -A3 com.gymwatch`.
+8. **Back closes an editor, not the app.** Hold a preset, then press the back
+   button: the presets come back with the old length.
+9. **Rest + Sets stays in sync.** Start a rest and tap + there, swipe to REST
+   and COUNTER: same countdown, same count. Stop it on REST, swipe back: idle.
 
 ## Verified on device — 2026-09-09
 
@@ -160,7 +168,8 @@ These are the ones that catch real regressions; automated tests cannot.
 
 Not yet verified: haptics, the rest-timer buzz at zero, and the Ongoing Activity
 indicator on the watch face. All need a human wearing the watch — adb cannot
-feel a vibration.
+feel a vibration. (Since 2026-09-10 the buzz timing is checked from
+`dumpsys vibrator_manager` instead; see below.)
 
 ## Verified on device — themed skins, 2026-09-10
 
@@ -176,6 +185,25 @@ Release build with the Dragon Ball, Sailor Moon and Spy × Family skins.
 | Spy × Family on the watch | **not verified on device** — scripted runs kept falling out of the app (`docs/LESSONS.md` #23). Covered by `WallpaperContrastTest` and the review crops only |
 
 Switch skins by hand under **Settings > SKIN**; there is no deep link for it.
+
+## Verified on device — late alarm, back button, Rest + Sets, 2026-09-10
+
+Release build, Sailor Moon skin, watch off the charger (`mIsPowered=false`).
+
+| Check | Result |
+|---|---|
+| Rest + Sets renders, appended as the 5th page on an upgraded install | pass |
+| 1:00 rest books an exact wake-up | pass — `ELAPSED_WAKEUP … WakeUpReceiver`, `exactAllowReason=policy_permission` |
+| **Buzz at zero with the screen off** | **pass — alarm delivered 21:15:25.149, first vibration 21:15:25.200, then every 3.0 s** (`dumpsys vibrator_manager`: `usage: ALARM`, `finished`) |
+| REST OVER on Rest + Sets: half ring full, big ■ in the rest colour | pass |
+| ■ stops it: idle, no wake lock, no pending alarm | pass — `mWakeLockSummary=0x0` |
+| + on Rest + Sets shows on COUNTER | pass — 1 on both |
+| Back in the rest editor returns to the page, app stays resumed | pass — `input keyevent KEYCODE_BACK` |
+
+The vibration history is the useful proof here: `dumpsys vibrator_manager`
+lists every vibration with its start time and whether it `finished` or was
+`ignored_*`, which is as close as adb gets to feeling one. The screen was
+dozing when the rest started; whether it was still off at zero is not proven.
 
 ## Pairing, as actually done
 

@@ -1,5 +1,6 @@
 package com.gymwatch.core.application
 
+import com.gymwatch.core.application.fake.FakeWakeUp
 import com.gymwatch.core.application.fake.InMemoryWorkoutSetupRepository
 import com.gymwatch.core.application.fake.RecordingHaptics
 import com.gymwatch.core.application.fake.SchedulerClock
@@ -15,6 +16,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -29,9 +31,107 @@ class RestTimerUseCaseTest {
     private fun TestScope.restTimer(
         haptics: RecordingHaptics = RecordingHaptics(),
         setup: InMemoryWorkoutSetupRepository = setupOf(30, 60, 120),
-    ) = RestTimerUseCase(SchedulerClock(testScheduler), setup, haptics, backgroundScope)
+        clock: SchedulerClock = SchedulerClock(testScheduler),
+        wakeUp: FakeWakeUp = FakeWakeUp(),
+    ) = RestTimerUseCase(clock, setup, haptics, wakeUp, backgroundScope)
 
     private val RecordingHaptics.buzzes get() = played.count { it == Haptic.REST_OVER }
+
+    @Test
+    fun `a countdown books a wake-up for its zero`() = runTest {
+        val clock = SchedulerClock(testScheduler)
+        val wakeUp = FakeWakeUp()
+        val useCase = restTimer(clock = clock, wakeUp = wakeUp)
+        runCurrent()
+        advanceTimeBy(7.seconds)
+
+        useCase.start(index = 0)
+        runCurrent()
+
+        assertEquals(clock.elapsed() + 30.seconds, wakeUp.pendingAt)
+    }
+
+    @Test
+    fun `the alarm rings on time when the watch slept through zero`() = runTest {
+        // The bug on the watch: the screen went off mid-rest, the CPU suspended,
+        // and the watchdog's delay stopped counting. The clock says zero; the
+        // delay still thinks there are 20 s to go.
+        val haptics = RecordingHaptics()
+        val clock = SchedulerClock(testScheduler)
+        val wakeUp = FakeWakeUp()
+        val useCase = restTimer(haptics, clock = clock, wakeUp = wakeUp)
+        runCurrent()
+
+        useCase.start(index = 0)
+        runCurrent()
+        advanceTimeBy(10.seconds); runCurrent()
+        clock.deepSleep(20.seconds)
+
+        wakeUp.fire()
+        runCurrent()
+
+        assertEquals(1, haptics.buzzes, "rings when woken, not when the stalled delay ends")
+        assertTrue(useCase.alarming.value)
+        assertTrue(wakeUp.awake, "held awake so the repeats are not stalled too")
+
+        advanceTimeBy(RestTimerUseCase.ALARM_REPEAT); runCurrent()
+        assertEquals(2, haptics.buzzes)
+        advanceTimeBy(20.seconds); runCurrent()
+        // Every 3 s from the wake at 10 s: 13, then 16 through 31.
+        assertEquals(8, haptics.buzzes, "the stale delay ending does not add a second ring")
+    }
+
+    @Test
+    fun `a wake-up after the watchdog already rang changes nothing`() = runTest {
+        val haptics = RecordingHaptics()
+        val wakeUp = FakeWakeUp()
+        val useCase = restTimer(haptics, wakeUp = wakeUp)
+        runCurrent()
+
+        useCase.start(index = 0)
+        runCurrent()
+        advanceTimeBy(30.seconds); runCurrent()
+        assertEquals(1, haptics.buzzes)
+
+        wakeUp.fire()
+        runCurrent()
+        assertEquals(1, haptics.buzzes)
+    }
+
+    @Test
+    fun `stopping releases the wake-up and the wake lock`() = runTest {
+        val wakeUp = FakeWakeUp()
+        val useCase = restTimer(wakeUp = wakeUp)
+        runCurrent()
+
+        useCase.start(index = 0)
+        runCurrent()
+        advanceTimeBy(31.seconds); runCurrent()
+        assertTrue(wakeUp.awake)
+
+        useCase.requestStop()
+        assertFalse(wakeUp.awake)
+        assertNull(wakeUp.pendingAt)
+    }
+
+    @Test
+    fun `a restart books the new zero and holds nothing awake`() = runTest {
+        val haptics = RecordingHaptics()
+        val clock = SchedulerClock(testScheduler)
+        val wakeUp = FakeWakeUp()
+        val useCase = restTimer(haptics, clock = clock, wakeUp = wakeUp)
+        runCurrent()
+
+        useCase.start(index = 0)
+        runCurrent()
+        advanceTimeBy(31.seconds); runCurrent()
+
+        useCase.requestRestart()
+        runCurrent()
+
+        assertFalse(wakeUp.awake)
+        assertEquals(clock.elapsed() + 30.seconds, wakeUp.pendingAt)
+    }
 
     @Test
     fun `the alarm starts at zero, not before`() = runTest {

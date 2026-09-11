@@ -53,8 +53,9 @@ class ScreenLayoutTest {
             listOf(
                 AppScreen.CHRONOMETER,
                 AppScreen.REST_TIMER,
-                AppScreen.WORKOUTS,
                 AppScreen.COUNTER,
+                AppScreen.WORKOUTS,
+                AppScreen.REST_AND_COUNTER,
             ),
             moved.order,
         )
@@ -73,6 +74,20 @@ class ScreenLayoutTest {
         val partial = ScreenLayout.of(listOf(AppScreen.COUNTER), emptySet())
         assertEquals(AppScreen.entries.size, partial.order.size)
         assertEquals(AppScreen.COUNTER, partial.order.first())
+    }
+
+    @Test
+    fun `an install from before the combined screen gets it appended, visible`() {
+        val stored = listOf(
+            AppScreen.WORKOUTS,
+            AppScreen.COUNTER,
+            AppScreen.REST_TIMER,
+            AppScreen.CHRONOMETER,
+        )
+        val upgraded = ScreenLayout.of(stored, hidden = setOf(AppScreen.CHRONOMETER))
+
+        assertEquals(stored + AppScreen.REST_AND_COUNTER, upgraded.order)
+        assertTrue(upgraded.isVisible(AppScreen.REST_AND_COUNTER))
     }
 
     @Test

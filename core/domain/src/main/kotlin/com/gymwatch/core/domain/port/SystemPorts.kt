@@ -2,9 +2,33 @@ package com.gymwatch.core.domain.port
 
 import com.gymwatch.core.domain.model.ExerciseKind
 import com.gymwatch.core.domain.model.Haptic
+import kotlin.time.Duration
 
 fun interface HapticsPort {
     fun play(haptic: Haptic)
+}
+
+/**
+ * Gets the rest alarm out of deep sleep on time.
+ *
+ * A coroutine `delay` runs on a clock that stops while the CPU is suspended, and
+ * nothing wakes the CPU for it — so with the screen off, a countdown's zero came
+ * whenever something else happened to wake the watch (docs/LESSONS.md #31). The
+ * countdown itself was never wrong; only the buzz was late.
+ */
+interface WakeUpPort {
+    /**
+     * Wakes the device at [at], on [ClockPort]'s timeline, and calls [onWake].
+     * Replaces any earlier request. The device stays awake long enough for
+     * [onWake] to act.
+     */
+    fun wakeAt(at: Duration, onWake: () -> Unit)
+
+    /** Keeps the CPU running until [release] — while the alarm rings, so its repeats keep time. */
+    fun stayAwake()
+
+    /** Drops a pending [wakeAt] and lets the device sleep again. */
+    fun release()
 }
 
 /**

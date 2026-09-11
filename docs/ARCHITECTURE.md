@@ -35,7 +35,7 @@ the JVM with no emulator, no device, and no Robolectric.
 | `:core:domain` | kotlin-jvm | `Chronometer`, `RestTimer`, `RestPresets`, `Counter`, `WorkoutSetup`, `ScreenLayout`, `Skin`/`Palette`, `Contrast`, `ExerciseKind`, `ResetOutcome`; all port interfaces |
 | `:core:application` | kotlin-jvm | `ChronometerUseCase`, `RestTimerUseCase`, `CounterUseCase`, `WorkoutSetupUseCase`, `ScreenLayoutUseCase`, `SkinUseCase` |
 | `:adapters:driven:persistence` | android-lib | DataStore implementations of the repository ports |
-| `:adapters:driven:platform` | android-lib | `ClockPort`, `HapticsPort`, `OngoingActivityPort`, `CompanionHealthAppPort`; `SamsungHealthIcons` |
+| `:adapters:driven:platform` | android-lib | `ClockPort`, `HapticsPort`, `WakeUpPort`, `OngoingActivityPort`, `CompanionHealthAppPort`; `SamsungHealthIcons` |
 | `:adapters:driving:ui-compose` | android-lib | Screens |
 | `:adapters:driving:service` | android-lib | Timer foreground service |
 | `:app` | android-app | Composition root, manifest, permissions |
@@ -56,6 +56,7 @@ the JVM with no emulator, no device, and no Robolectric.
 | `SkinRepositoryPort` | DataStore | The selected colour scheme, stored by enum name |
 | `CompanionHealthAppPort` | `PackageManager`, `startActivity` | Opens Samsung Health, which owns the workout record — on an exercise's start screen, or its home screen. Names no package and no intent; that is the adapter's business (`docs/LESSONS.md` #28) |
 | `HapticsPort` | `Vibrator` | |
+| `WakeUpPort` | `AlarmManager`, `PowerManager` | Wakes the watch at the rest timer's zero and holds it awake while the alarm rings. A `delay` alone stalls in deep sleep (`docs/LESSONS.md` #31) |
 | `OngoingActivityPort` | `androidx.wear.ongoing` | |
 
 `port/` holds interfaces only. Value types such as `Haptic` and
@@ -93,6 +94,10 @@ need waking — and would be far harder to test.
 
 The rest alarm follows the same rule: the start mark is kept past zero until the
 user stops or restarts it, so "is it ringing?" is also a question for the clock.
+
+The one thing the clock cannot do is *act* at a time. Deriving a value needs
+nothing running; buzzing at zero needs the CPU awake at zero, which is what
+`WakeUpPort` is for (`docs/LESSONS.md` #31).
 
 The same property makes the domain trivially testable: pass a `FakeClock`,
 advance it by 45 minutes instantly, assert. See `ChronometerTest`.

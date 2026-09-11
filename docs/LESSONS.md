@@ -806,3 +806,57 @@ error that looks like a value problem. Use `RectangleF` for both.
 **Avoid it by:** checking any "how much to dim" number against the way the GPU
 blends rather than against the luminance formula, and saving any `.ps1` that
 contains non-ASCII text with a BOM.
+
+---
+
+## 31 — A coroutine `delay` does not count deep sleep; the rest alarm buzzed late
+*2026-09-10 · correctness · reported by the user*
+
+**Symptom:** "when the timer reaches zero the alarm is not working, it only
+starts some time after." The countdown on screen was right, and REST OVER
+showed on time when the watch was looked at. Only the buzz was late.
+
+**Cause:** the watchdog in `RestTimerUseCase` slept with `delay(remaining)`. Its
+comment said "a long doze cannot make the alarm start late", because it
+re-checks the clock on waking — and the *check* is sound. The *waking* is not. Coroutine delays, like
+`Handler.postDelayed` and `Thread.sleep`, run on a monotonic clock that stops
+while the CPU is suspended, and nothing asks the system to wake the CPU for
+them. With the screen off a rest is mostly deep sleep, so the delay's 60 s took
+as long as it took for something else — a wrist raise, a notification — to wake
+the watch, plus whatever was left of the 60 s after that.
+
+`SystemClock.elapsedRealtime()` *does* count sleep. That is why the chronometer
+survived doze in the 2026-09-09 device check and made this look solved: the
+numbers derived from it were always right. A value read from the clock and an
+action scheduled *at* a clock time are different problems.
+
+The runbook listed "the rest-timer buzz at zero" as not verified on device, for
+the right reason — adb cannot feel a vibration.
+
+**Fix:**
+
+- `WakeUpPort` in the core; `AndroidWakeUp` books an exact
+  `ELAPSED_REALTIME_WAKEUP` alarm for the zero mark. Its receiver takes a
+  10-second wake lock and restarts the watchdog, which then finds zero on the
+  clock and rings.
+- While ringing, a partial wake lock (capped at 10 minutes) keeps the 3-second
+  repeats from stalling the same way. Stop and restart release it.
+- `USE_EXACT_ALARM`, not `SCHEDULE_EXACT_ALARM`: the latter starts denied for
+  apps targeting 33+, the former is granted at install to timer apps. If exact
+  alarms are ever refused, the adapter falls back to an inexact one.
+- The REST_OVER vibration is tagged `USAGE_ALARM`. Untagged vibrations from a
+  background process are dropped, and so are most in power-saving mode; alarm
+  usage is exempt from both. Only this pattern — taps and ticks stay untagged.
+
+`RestTimerUseCaseTest` models it: `SchedulerClock.deepSleep` moves the clock
+without moving pending delays, and `FakeWakeUp.fire` is the alarm.
+
+**Verified on the watch** (0.2.0 release, screen dozing when the rest began):
+the alarm was delivered at 21:15:25.149 and the first vibration started at
+21:15:25.200, then every 3.0 s. `dumpsys vibrator_manager` keeps that history
+with start times and outcome, so "did it buzz, and when" no longer needs a
+human wearing the watch.
+
+**Avoid it by:** asking of any timed action "what wakes the CPU for this?" If the
+answer is nothing, it is a display loop, not an alarm. Deriving the *value* from
+`elapsedRealtime` is necessary and not sufficient.

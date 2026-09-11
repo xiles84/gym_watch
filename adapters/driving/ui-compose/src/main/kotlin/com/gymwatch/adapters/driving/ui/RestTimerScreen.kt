@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -62,22 +63,7 @@ fun RestTimerScreen(
     @Suppress("UNUSED_EXPRESSION") tick
     val alarming = useCase.isAlarmingNow()
     val counting = useCase.needsResetConfirmationNow()
-
-    var confirming by remember { mutableStateOf(false) }
-    // Kept after the dialog closes so its title does not change mid-exit.
-    var question by remember { mutableStateOf(RestQuestion.STOP) }
-    // Without this, a question left open when zero arrived would pop up again
-    // the moment the next countdown started.
-    LaunchedEffect(counting) {
-        if (!counting) confirming = false
-    }
-
-    fun ask(outcome: ResetOutcome, about: RestQuestion) {
-        if (outcome == ResetOutcome.NEEDS_CONFIRMATION) {
-            question = about
-            confirming = true
-        }
-    }
+    val questions = rememberRestQuestions(useCase, counting)
 
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Backdrop(
@@ -97,8 +83,8 @@ fun RestTimerScreen(
             counting -> RunningRest(
                 remainingLabel = useCase.remainingNow().asRestLabel(),
                 progress = useCase.progressNow(),
-                onRestart = { ask(useCase.requestRestart(), RestQuestion.RESTART) },
-                onStop = { ask(useCase.requestStop(), RestQuestion.STOP) },
+                onRestart = questions::restart,
+                onStop = questions::stop,
             )
 
             else -> Column(
@@ -128,25 +114,67 @@ fun RestTimerScreen(
         }
     }
 
-    ConfirmResetDialog(
-        visible = confirming && counting,
-        title = question.title,
-        detail = "${useCase.remainingNow().asRestLabel()} left",
-        onConfirm = {
-            when (question) {
-                RestQuestion.RESTART -> useCase.confirmRestart()
-                RestQuestion.STOP -> useCase.confirmStop()
-            }
-            confirming = false
-        },
-        onDismiss = { confirming = false },
-    )
+    RestQuestionDialog(questions, useCase, counting)
 }
 
 /** Which of the two buttons the open question is about. */
-private enum class RestQuestion(val title: String) {
+internal enum class RestQuestion(val title: String) {
     RESTART("Restart rest?"),
     STOP("Stop rest?"),
+}
+
+/**
+ * The question ↺ and ■ ask mid-countdown. Shared by every screen that runs the
+ * rest timer, so the rules for when to ask cannot drift between them.
+ */
+@Stable
+internal class RestQuestions(private val useCase: RestTimerUseCase) {
+    var confirming by mutableStateOf(false)
+
+    /** Kept after the dialog closes so its title does not change mid-exit. */
+    var question by mutableStateOf(RestQuestion.STOP)
+        private set
+
+    fun restart() = ask(useCase.requestRestart(), RestQuestion.RESTART)
+
+    fun stop() = ask(useCase.requestStop(), RestQuestion.STOP)
+
+    fun confirm() {
+        when (question) {
+            RestQuestion.RESTART -> useCase.confirmRestart()
+            RestQuestion.STOP -> useCase.confirmStop()
+        }
+        confirming = false
+    }
+
+    private fun ask(outcome: ResetOutcome, about: RestQuestion) {
+        if (outcome == ResetOutcome.NEEDS_CONFIRMATION) {
+            question = about
+            confirming = true
+        }
+    }
+}
+
+@Composable
+internal fun rememberRestQuestions(useCase: RestTimerUseCase, counting: Boolean): RestQuestions {
+    val questions = remember(useCase) { RestQuestions(useCase) }
+    // Without this, a question left open when zero arrived would pop up again
+    // the moment the next countdown started.
+    LaunchedEffect(counting) {
+        if (!counting) questions.confirming = false
+    }
+    return questions
+}
+
+@Composable
+internal fun RestQuestionDialog(questions: RestQuestions, useCase: RestTimerUseCase, counting: Boolean) {
+    ConfirmResetDialog(
+        visible = questions.confirming && counting,
+        title = questions.question.title,
+        detail = "${useCase.remainingNow().asRestLabel()} left",
+        onConfirm = questions::confirm,
+        onDismiss = { questions.confirming = false },
+    )
 }
 
 @Composable
@@ -224,8 +252,13 @@ private fun RestAlarm(onRestart: () -> Unit, onStop: () -> Unit) {
     }
 }
 
+/**
+ * The countdown around the rim. By default the whole circle from twelve
+ * o'clock; [startAngle] and [span] give a partial arc, measured clockwise from
+ * three o'clock as Compose does.
+ */
 @Composable
-private fun RestRing(progress: Float) {
+internal fun RestRing(progress: Float, startAngle: Float = -90f, span: Float = 360f) {
     // A Canvas block is not a composable scope, so the palette is read here
     // and closed over rather than looked up per draw.
     val palette = LocalPalette.current
@@ -239,8 +272,8 @@ private fun RestRing(progress: Float) {
         // out against, instead of whatever the picture has at the rim.
         drawArc(
             color = palette.background,
-            startAngle = -90f,
-            sweepAngle = 360f,
+            startAngle = startAngle,
+            sweepAngle = span,
             useCenter = false,
             topLeft = Offset(inset, inset),
             size = arcSize,
@@ -248,8 +281,8 @@ private fun RestRing(progress: Float) {
         )
         drawArc(
             color = palette.surface,
-            startAngle = -90f,
-            sweepAngle = 360f,
+            startAngle = startAngle,
+            sweepAngle = span,
             useCenter = false,
             topLeft = Offset(inset, inset),
             size = arcSize,
@@ -257,8 +290,8 @@ private fun RestRing(progress: Float) {
         )
         drawArc(
             color = palette.rest,
-            startAngle = -90f,
-            sweepAngle = 360f * progress,
+            startAngle = startAngle,
+            sweepAngle = span * progress,
             useCenter = false,
             topLeft = Offset(inset, inset),
             size = arcSize,
@@ -272,14 +305,15 @@ private fun RestRing(progress: Float) {
  * never happens by accident mid-set.
  */
 @Composable
-private fun PresetButton(
+internal fun PresetButton(
     label: String,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    size: Int = 52,
 ) {
     Box(
         modifier = Modifier
-            .size(52.dp)
+            .size(size.dp)
             .background(GymColors.Surface, CircleShape)
             .border(1.dp, GymColors.Outline, CircleShape)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),

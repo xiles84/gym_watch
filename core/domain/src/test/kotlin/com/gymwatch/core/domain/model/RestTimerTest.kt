@@ -3,6 +3,7 @@ package com.gymwatch.core.domain.model
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -21,6 +22,12 @@ class RestTimerTest {
     fun `remaining counts down from the start mark`() {
         val timer = RestTimer(duration = 90.seconds).start(now = 10.seconds)
         assertEquals(60.seconds, timer.remainingAt(40.seconds))
+    }
+
+    @Test
+    fun `the zero mark is the start plus the length, and idle has none`() {
+        assertEquals(100.seconds, RestTimer(duration = 90.seconds).start(now = 10.seconds).zeroMark)
+        assertNull(RestTimer(duration = 90.seconds).zeroMark)
     }
 
     @Test

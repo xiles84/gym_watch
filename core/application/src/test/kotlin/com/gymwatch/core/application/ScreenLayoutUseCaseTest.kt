@@ -30,7 +30,7 @@ class ScreenLayoutUseCaseTest {
 
         val saved = requireNotNull(f.repository.saved)
         assertEquals(setOf(AppScreen.COUNTER), saved.hidden)
-        assertEquals(3, saved.visible.size)
+        assertEquals(AppScreen.entries.size - 1, saved.visible.size)
     }
 
     @Test
@@ -69,8 +69,9 @@ class ScreenLayoutUseCaseTest {
             listOf(
                 AppScreen.CHRONOMETER,
                 AppScreen.REST_TIMER,
-                AppScreen.WORKOUTS,
                 AppScreen.COUNTER,
+                AppScreen.WORKOUTS,
+                AppScreen.REST_AND_COUNTER,
             ),
             requireNotNull(f.repository.saved).order,
         )

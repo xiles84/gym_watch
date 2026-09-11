@@ -1,5 +1,6 @@
 package com.gymwatch.adapters.driving.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -86,6 +87,12 @@ fun GymApp(
         onScreenHandled()
     }
 
+    // The watch's back button closes an editor instead of leaving the app.
+    // Without a handler, back finished the Activity from inside the rest editor.
+    // Nothing is saved: ✓ is the only way to keep a change, so backing out is
+    // also how to cancel one.
+    BackHandler(enabled = editing != null) { editing = null }
+
     GymTheme(skin) {
         Box(Modifier.fillMaxSize().background(GymColors.Background)) {
             when (val editor = editing) {
@@ -131,6 +138,12 @@ fun GymApp(
                                 )
 
                                 AppScreen.COUNTER -> CounterScreen(counter)
+
+                                AppScreen.REST_AND_COUNTER -> RestAndCounterScreen(
+                                    restTimer = restTimer,
+                                    counter = counter,
+                                    onEditPreset = { editing = Editor.Preset(it) },
+                                )
 
                                 AppScreen.WORKOUTS -> WorkoutsScreen(
                                     useCase = workouts,
@@ -181,6 +194,7 @@ private fun wallpaperSlotOf(screen: AppScreen?): WallpaperSlot = when (screen) {
     AppScreen.CHRONOMETER -> WallpaperSlot.CHRONO
     AppScreen.REST_TIMER -> WallpaperSlot.REST
     AppScreen.COUNTER -> WallpaperSlot.COUNTER
+    AppScreen.REST_AND_COUNTER -> WallpaperSlot.REST_AND_COUNTER
     AppScreen.WORKOUTS -> WallpaperSlot.WORKOUTS
     null -> WallpaperSlot.SETTINGS
 }
