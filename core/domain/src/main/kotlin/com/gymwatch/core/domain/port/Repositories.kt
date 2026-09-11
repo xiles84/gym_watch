@@ -1,6 +1,7 @@
 package com.gymwatch.core.domain.port
 
 import com.gymwatch.core.domain.model.Counter
+import com.gymwatch.core.domain.model.RecentAudiobooks
 import com.gymwatch.core.domain.model.ScreenLayout
 import com.gymwatch.core.domain.model.Skin
 import com.gymwatch.core.domain.model.WorkoutSetup
@@ -31,4 +32,16 @@ interface ScreenLayoutRepositoryPort {
 interface SkinRepositoryPort {
     val skin: Flow<Skin>
     suspend fun save(skin: Skin)
+}
+
+/**
+ * The recently listened audiobooks, shared by the phone and the watch.
+ *
+ * The phone writes it as books are played; the watch only reads it. [recent]
+ * must emit the stored list first, even when that list is empty, because a
+ * write is based on it (docs/LESSONS.md #10).
+ */
+interface RecentAudiobooksRepositoryPort {
+    val recent: Flow<RecentAudiobooks>
+    suspend fun save(recent: RecentAudiobooks)
 }

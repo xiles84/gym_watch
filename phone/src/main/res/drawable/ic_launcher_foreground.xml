@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A stopwatch dial. 108dp canvas, artwork kept inside the safe 72dp centre. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- crown -->
+    <path
+        android:fillColor="#9FE1CB"
+        android:pathData="M48,22 h12 v6 h-12 z" />
+
+    <!-- dial -->
+    <path
+        android:strokeColor="#9FE1CB"
+        android:strokeWidth="6"
+        android:fillColor="#00000000"
+        android:pathData="M54,32 m-24,0 a24,24 0 1,0 48,0 a24,24 0 1,0 -48,0" />
+
+    <!-- hand, pointing to about 10 past -->
+    <path
+        android:strokeColor="#FAC775"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M54,56 L54,42" />
+</vector>

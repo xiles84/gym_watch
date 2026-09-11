@@ -72,6 +72,7 @@ class ScreenLayoutUseCaseTest {
                 AppScreen.COUNTER,
                 AppScreen.WORKOUTS,
                 AppScreen.REST_AND_COUNTER,
+                AppScreen.MEDIA,
             ),
             requireNotNull(f.repository.saved).order,
         )

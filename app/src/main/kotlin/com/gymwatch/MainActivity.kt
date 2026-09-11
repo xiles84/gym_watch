@@ -14,6 +14,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.gymwatch.adapters.driving.service.GymSessionService
 import com.gymwatch.adapters.driving.ui.GymApp
+import com.gymwatch.adapters.driving.ui.MediaIcons
 import com.gymwatch.adapters.driving.ui.WorkoutIcons
 import com.gymwatch.core.domain.model.AppScreen
 import kotlinx.coroutines.flow.combine
@@ -61,6 +62,9 @@ class MainActivity : ComponentActivity() {
                 counter = container.counter,
                 workouts = container.workouts,
                 workoutIcons = WorkoutIcons(container.workoutIcons::bitmap),
+                audiobooks = container.audiobooks,
+                mediaShortcuts = container.mediaShortcuts,
+                mediaIcons = MediaIcons(container.mediaApps::icon),
                 screenLayout = container.screenLayout,
                 skins = container.skins,
                 requestedScreen = pendingScreen,

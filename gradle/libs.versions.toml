@@ -24,6 +24,12 @@ wearOngoing = "1.1.0"
 wearToolingPreview = "1.0.0"
 coreKtx = "1.19.0"
 
+# Phone <-> watch sync (Wearable Data Layer). Resolved against Google Maven on 2026-09-10.
+playServicesWearable = "20.0.1"
+# Play services still depends on fragment 1.0.0, which breaks registerForActivityResult
+# (lint: InvalidFragmentVersionForActivityResult). Pinned wherever Play services is used.
+fragment = "1.9.0"
+
 # JVM unit tests inside Android modules (AGP runs them on JUnit 4).
 junit = "4.13.2"
 
@@ -48,6 +54,10 @@ androidx-datastore-preferences = { module = "androidx.datastore:datastore-prefer
 androidx-compose-foundation = { module = "androidx.compose.foundation:foundation" }
 androidx-compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
 androidx-compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
+androidx-compose-material3 = { module = "androidx.compose.material3:material3" }
+play-services-wearable = { module = "com.google.android.gms:play-services-wearable", version.ref = "playServicesWearable" }
+androidx-fragment = { module = "androidx.fragment:fragment", version.ref = "fragment" }
+kotlinx-coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-play-services", version.ref = "coroutines" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

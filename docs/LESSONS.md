@@ -860,3 +860,114 @@ human wearing the watch.
 **Avoid it by:** asking of any timed action "what wakes the CPU for this?" If the
 answer is nothing, it is a display loop, not an alarm. Deriving the *value* from
 `elapsedRealtime` is necessary and not sufficient.
+
+---
+
+## 32 — Audible on the phone: browsing is locked, a title search on its session is not
+*2026-09-10 · feasibility · probed on the SM-S918B with Audible 26.34.07*
+
+**Question:** could the watch pick an audiobook and start it **on the phone**?
+Audible's Wear OS app plays only on the watch. Spotify's already offers "play on
+phone", so only Audible needed an answer. It decides whether a Media screen is
+worth building.
+
+**Tried, in order,** with Google's Media Controller Test app (built from
+googlesamples/android-media-controller in a scratch dir, bumped to Gradle 9.6 /
+AGP 9.4) and adb:
+
+1. **Browse (`MediaBrowserService`) — blocked.** Audible exports
+   `.AndroidMediaBrowserService`, but caller trust is signature-based. Its log:
+   `TrustedPackageManager: signature based package trust logic`, then
+   `No root for client com.example.android.mediacontroller`. A companion app we
+   sign gets the same refusal, so we can't list the library.
+2. **`MEDIA_PLAY_FROM_SEARCH` activity intent — only opens the app.**
+   `.MainLauncher` declares it, but with an empty query or with a title it
+   just shows Audible's UI; nothing plays.
+3. **`MediaController` on Audible's active session — works.** Reach it through
+   `MediaSessionManager.getActiveSessions`, which needs notification-listener
+   access.
+   - `play()` and pause both work.
+   - `playFromSearch("The Case of the Felonious Faire")` switched away from the
+     loaded book and played that one from its saved position. The switch took
+     15–20 s.
+   - A partial title is enough: `"Felonious"` played the Felonious Faire.
+   - **Searching for the book that is already loaded puts the session into
+     `STATE_ERROR`**, and nothing plays. `play()` is the call for that book.
+
+   *Corrected the same day.* The first write-up blamed the partial title for the
+   error, because the partial title tried (`"Mimic"`) was also the loaded book's.
+   The first watch tap sent the full title of the loaded book and failed the
+   same way; `"Felonious"` then worked. One variable changed at a time would
+   have caught it the first time.
+
+**What it means, as built:**
+- The media screen needs the `:phone` companion: a notification listener, plus
+  a Data Layer request from the watch (#33).
+- There's no library list. The companion builds one from what it sees Audible
+  play, and `AudibleSessionPlayer` resumes the loaded book instead of searching
+  for it.
+- A switch takes 10–20 s, and the watch row says "starting on phone…" for that
+  long.
+
+Not tested: a cold start with no Audible session at all. The companion sends a
+play key to Audible's media button receiver and waits for a session.
+
+**Avoid it by:** testing each layer separately. Browse, the activity intent, and
+session transport controls each have their own gate, and the manifest advertising
+an action proves nothing about who may call it. `dumpsys media_session` shows the
+state and the loaded title, so each step can be checked without watching the phone.
+
+---
+
+## 33 — Data Layer: match items by path, and pair the apps by package and key
+*2026-09-10 · platform · phone companion for the media screen*
+
+**Symptom:** after the phone app got notification access, its list stayed
+empty with Audible's book loaded. No errors, no crash.
+
+**Cause:** the item *was* written. `dumpsys activity service
+com.google.android.gms/.wearable.service.WearableService` showed
+`com.gymwatch: … DataItem SET (4)`, and the bytes going out on the watch
+link. The reads were failing: `getDataItems(uri)` and
+`addListener(listener, uri, FILTER_LITERAL)` took `wear:/gymwatch/audiobooks/recent`,
+a URI built with a path and no host, and found nothing.
+
+That produced four writes rather than one. The tracker seeds an empty list,
+every read said "empty", so every player event seeded it again. In the same
+dump, other apps' listeners show `Authority: "" WILD`; ours had no authority
+line at all.
+
+**Fix:** `DataLayerRecentAudiobooks` never filters by URI. It reads
+`dataItems` and listens with `addListener(listener)`, then keeps the items
+whose `uri.path` matches. A client only sees its own app's items, so the path
+is enough. The list showed up at once on the phone and, after one install, on
+the watch.
+
+**Three other things this needed:**
+- **Same app to the Data Layer.** The phone module ships as `applicationId
+  com.gymwatch`, signed with the watch's release key. Anything else is silently
+  invisible. Compare with
+  `java -jar $ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar verify --print-certs`.
+- **Play services drags in `androidx.fragment` 1.0.0.** `:app:lintDebug` then
+  fails on `registerForActivityResult` (`InvalidFragmentVersionForActivityResult`).
+  `:adapters:driven:wearsync` pins `fragment` 1.9.0 as `api`.
+- **A request, not a message, to start a book.** `MessageClient.sendRequest`
+  returns the phone's answer, and `WearableListenerService.onRequest` handles
+  it, filtered by action `com.google.android.gms.wearable.REQUEST_RECEIVED` in
+  the manifest. Both exist in play-services-wearable 20.0.1, checked with
+  `javap` on the AAR rather than from memory. A DataItem would have replayed the
+  tap whenever the phone reconnected.
+
+Also guessed wrong and caught on the device: the watch's media controller is
+`com.samsung.android.mediacontroller`, not `…wear.mediacontroller`.
+`pm list packages` on the watch settles it in one line.
+
+**And the phone never hears about its own writes.** Once reads worked, the
+watch's list followed each change live, but the phone's screen kept the list it
+loaded at startup. `OnDataChangedListener` delivered the other device's changes,
+not this device's. `DataLayerRecentAudiobooks` now merges its own successful
+`save` into `recent`.
+
+**Avoid it by:** when data doesn't show up, first ask the system whether it was
+written. The Wearable service dump counts writes per app, which splits
+"never sent" from "can't read it back" in one step.

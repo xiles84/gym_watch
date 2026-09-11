@@ -19,6 +19,9 @@
          Package visibility has to be declared for any of that to see it. -->
     <queries>
         <package android:name="com.samsung.android.wear.shealth" />
+        <!-- The media screen's shortcuts: opened and read for icons here. -->
+        <package android:name="com.spotify.music" />
+        <package android:name="com.samsung.android.mediacontroller" />
     </queries>
 
     <application>

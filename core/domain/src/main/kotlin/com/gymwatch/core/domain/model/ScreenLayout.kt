@@ -14,7 +14,10 @@ enum class AppScreen(val title: String) {
 
     /** The rest timer and the counter on one page — the two you touch between sets. */
     REST_AND_COUNTER("Rest + Sets"),
-    WORKOUTS("Workouts");
+    WORKOUTS("Workouts"),
+
+    /** Recent audiobooks started on the phone, plus shortcuts to Spotify and the phone's controls. */
+    MEDIA("Media");
 
     companion object {
         /**

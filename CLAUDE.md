@@ -2,8 +2,10 @@
 
 A Wear OS app for a Samsung Galaxy Watch, used at the gym: chronometer, a rest
 timer with three one-tap presets and an alarm at zero, a set counter, and three
-workout shortcuts that open Samsung Health on that exercise. Screens can be
-reordered or turned off.
+workout shortcuts that open Samsung Health on that exercise. A media screen
+opens Spotify or the phone's media controls, and lists the last ten Audible
+books, which start *on the phone* through a companion app in `:phone`. Screens
+can be reordered or turned off.
 
 **Read `docs/LESSONS.md` before doing anything non-trivial.** It exists so the
 same problem is not solved twice. Most of what looks like an arbitrary choice in
@@ -49,10 +51,15 @@ If a lesson turns out to be wrong, correct it in place — do not leave both.
 :core:domain        kotlin("jvm")  entities + port interfaces. No dependencies.
 :core:application   kotlin("jvm")  use cases. Depends only on :core:domain.
 :adapters:driven:*  Android        DataStore, platform (clock, haptics,
-                                   notifications, Samsung Health launcher)
+                                   notifications, Samsung Health and media
+                                   launchers), wearsync (Data Layer, both apps),
+                                   audible (phone only)
 :adapters:driving:* Android        Wear Compose UI, foreground service, tile
-:app                               composition root — the only module that
-                                   knows every adapter
+:app                               watch composition root — the only module
+                                   that knows every watch adapter
+:phone                             phone companion composition root. Same
+                                   applicationId and release key as :app, or
+                                   the Data Layer never connects them (lesson 33)
 :watchface                         WFF, resource-only, separate APK
 ```
 
@@ -65,6 +72,7 @@ requires editing `:core` to add a UI, the design has gone wrong.
 ```bash
 ./gradlew :core:domain:test :core:application:test   # pure JVM, no device needed
 ./gradlew :adapters:driven:platform:testDebugUnitTest # Samsung Health name mapping
+./gradlew :adapters:driven:wearsync:testDebugUnitTest :adapters:driven:audible:testDebugUnitTest
 ./gradlew build
 ```
 

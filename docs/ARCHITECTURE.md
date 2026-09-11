@@ -32,13 +32,16 @@ the JVM with no emulator, no device, and no Robolectric.
 
 | Module | Type | Contains |
 |---|---|---|
-| `:core:domain` | kotlin-jvm | `Chronometer`, `RestTimer`, `RestPresets`, `Counter`, `WorkoutSetup`, `ScreenLayout`, `Skin`/`Palette`, `Contrast`, `ExerciseKind`, `ResetOutcome`; all port interfaces |
-| `:core:application` | kotlin-jvm | `ChronometerUseCase`, `RestTimerUseCase`, `CounterUseCase`, `WorkoutSetupUseCase`, `ScreenLayoutUseCase`, `SkinUseCase` |
+| `:core:domain` | kotlin-jvm | `Chronometer`, `RestTimer`, `RestPresets`, `Counter`, `WorkoutSetup`, `ScreenLayout`, `Skin`/`Palette`, `Contrast`, `ExerciseKind`, `ResetOutcome`, `Audiobook`/`NowPlaying`/`PlayOutcome`, `RecentAudiobooks`, `MediaApp`; all port interfaces |
+| `:core:application` | kotlin-jvm | `ChronometerUseCase`, `RestTimerUseCase`, `CounterUseCase`, `WorkoutSetupUseCase`, `ScreenLayoutUseCase`, `SkinUseCase`, `AudiobooksUseCase`, `MediaShortcutsUseCase`, `ListeningTrackerUseCase` (phone) |
 | `:adapters:driven:persistence` | android-lib | DataStore implementations of the repository ports |
-| `:adapters:driven:platform` | android-lib | `ClockPort`, `HapticsPort`, `WakeUpPort`, `OngoingActivityPort`, `CompanionHealthAppPort`; `SamsungHealthIcons` |
+| `:adapters:driven:platform` | android-lib | `ClockPort`, `HapticsPort`, `WakeUpPort`, `OngoingActivityPort`, `CompanionHealthAppPort`, `MediaAppsPort`; `SamsungHealthIcons` |
+| `:adapters:driven:wearsync` | android-lib | Wearable Data Layer, used by both apps: `RecentAudiobooksRepositoryPort` (a synced DataItem) and the watch's `AudiobookPlayerPort` (a request to the phone) |
+| `:adapters:driven:audible` | android-lib | Phone only. Audible's media session: what it plays, and the phone's `AudiobookPlayerPort` |
 | `:adapters:driving:ui-compose` | android-lib | Screens |
 | `:adapters:driving:service` | android-lib | Timer foreground service |
-| `:app` | android-app | Composition root, manifest, permissions |
+| `:app` | android-app | Watch composition root, manifest, permissions |
+| `:phone` | android-app | Phone companion composition root: notification listener, play-request service, setup screen. Same `applicationId` and signing key as `:app` |
 | `:watchface` | android-app | WFF resources only — separate APK |
 
 ## Ports
@@ -58,6 +61,30 @@ the JVM with no emulator, no device, and no Robolectric.
 | `HapticsPort` | `Vibrator` | |
 | `WakeUpPort` | `AlarmManager`, `PowerManager` | Wakes the watch at the rest timer's zero and holds it awake while the alarm rings. A `delay` alone stalls in deep sleep (`docs/LESSONS.md` #31) |
 | `OngoingActivityPort` | `androidx.wear.ongoing` | |
+| `MediaAppsPort` | `PackageManager`, `startActivity` | Spotify and Samsung's media controller on the watch |
+| `RecentAudiobooksRepositoryPort` | Wearable `DataClient` | The last ten books, written by the phone, read by both. Matched by path, never a URI filter (`docs/LESSONS.md` #33) |
+| `AudiobookPlayerPort` | watch: `MessageClient.sendRequest`; phone: Audible's `MediaController` | Starts a book on the phone by title. The one route Audible leaves open (#32) |
+| `NowPlayingPort` | Audible's `MediaController` (phone) | The loaded book, for the phone's Capture button |
+
+## The phone companion
+
+Audible's watch app plays only on the watch, and Audible won't let another app
+browse its library. What it does allow is a title search on its playback
+session, from an app holding notification access. So the phone runs the same
+core behind a second composition root, `:phone`:
+
+- `AudiobookListenerService` exists for that access. It feeds what Audible plays
+  into `ListeningTrackerUseCase`, which counts a book after a minute and writes
+  the list. The phone screen's **Capture** asks the same tracker, through
+  `NowPlayingPort`, to put the loaded book on top at once. Going through the
+  tracker's queue means a capture can't race an automatic write.
+- The list is a Data Layer item. Play services syncs it, and both devices keep
+  a copy.
+- A tap on the watch is a Data Layer *request*. `PlayRequestService` answers it
+  with a `PlayOutcome`, so the watch can say why a book didn't start.
+
+The two apps are one app to the Data Layer (same package, same key), and two
+APKs to everything else.
 
 `port/` holds interfaces only. Value types such as `Haptic` and
 `ResetOutcome` live in `model/`, and `ArchitectureTest` enforces that.

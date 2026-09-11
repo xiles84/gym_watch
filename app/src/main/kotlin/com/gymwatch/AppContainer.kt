@@ -7,11 +7,16 @@ import com.gymwatch.adapters.driven.platform.AndroidClock
 import com.gymwatch.adapters.driven.platform.AndroidHaptics
 import com.gymwatch.adapters.driven.platform.AndroidWakeUp
 import com.gymwatch.adapters.driven.platform.GymNotifications
+import com.gymwatch.adapters.driven.platform.MediaAppLauncher
 import com.gymwatch.adapters.driven.platform.OngoingActivityAdapter
 import com.gymwatch.adapters.driven.platform.SamsungHealthIcons
 import com.gymwatch.adapters.driven.platform.SamsungHealthLauncher
+import com.gymwatch.adapters.driven.wearsync.DataLayerAudiobookPlayer
+import com.gymwatch.adapters.driven.wearsync.DataLayerRecentAudiobooks
+import com.gymwatch.core.application.AudiobooksUseCase
 import com.gymwatch.core.application.ChronometerUseCase
 import com.gymwatch.core.application.CounterUseCase
+import com.gymwatch.core.application.MediaShortcutsUseCase
 import com.gymwatch.core.application.RestTimerUseCase
 import com.gymwatch.core.application.ScreenLayoutUseCase
 import com.gymwatch.core.application.SkinUseCase
@@ -85,4 +90,20 @@ class AppContainer(private val context: Context) {
         haptics = haptics,
         scope = scope,
     )
+
+    /**
+     * The phone plays; the watch shows the list the phone app syncs and asks it
+     * to start a book (docs/LESSONS.md #32).
+     */
+    val audiobooks = AudiobooksUseCase(
+        repository = DataLayerRecentAudiobooks(context),
+        player = DataLayerAudiobookPlayer(context),
+        haptics = haptics,
+        scope = scope,
+    )
+
+    /** Spotify and the phone's media controls; also reads their launcher icons. */
+    val mediaApps = MediaAppLauncher(context)
+
+    val mediaShortcuts = MediaShortcutsUseCase(mediaApps, haptics)
 }

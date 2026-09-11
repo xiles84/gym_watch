@@ -85,7 +85,7 @@ adb -s <watch> shell am start -n com.gymwatch/.MainActivity \
 ```
 
 Valid names: `CHRONOMETER`, `REST_TIMER`, `COUNTER`, `REST_AND_COUNTER`,
-`WORKOUTS`. `PROFILES`, the old name, still lands on the workouts screen. An unknown or hidden one falls back
+`WORKOUTS`, `MEDIA`. `PROFILES`, the old name, still lands on the workouts screen. An unknown or hidden one falls back
 to the first visible screen.
 
 ## Permissions
@@ -123,6 +123,38 @@ Expect Samsung Health's start screen for that exercise, play button showing.
 Nothing is recorded unless start is pressed. If the names changed, refresh the
 snapshot in `SamsungExercisesTest` from `aapt2 dump resources` and `dexdump`,
 as #28 describes.
+
+## Phone companion (media screen audiobooks)
+
+The media screen's audiobook list comes from the phone app in `:phone`. It must
+be the same app to the Data Layer as the watch's: `applicationId com.gymwatch`,
+**release**-signed with the same key. A debug-signed phone app sees nothing and
+reports nothing (`docs/LESSONS.md` #33). The phone is an SM-S918B (S23 Ultra),
+also on Wi-Fi adb; with both attached every command needs `-s`.
+
+```bash
+./gradlew :app:assembleRelease :phone:assembleRelease
+adb -s <phone> install -r phone/build/outputs/apk/release/phone-release.apk
+adb -s <watch> install -r app/build/outputs/apk/release/app-release.apk
+```
+
+On the phone, open Gym Watch and tap **Allow access**. Notification access is
+what lets it see Audible's session (#32). It's a security setting, so the user
+switches it on, never a script. Check it:
+
+```bash
+adb -s <phone> shell settings get secure enabled_notification_listeners | tr ':' '\n' | grep gymwatch
+adb -s <phone> shell dumpsys media_session | grep -A12 com.audible.application   # state + loaded title
+adb -s <phone> shell dumpsys activity service com.google.android.gms/.wearable.service.WearableService \
+  | grep "com.gymwatch:"                                                           # DataItem SET count
+```
+
+If Audible isn't running there's no session and nothing to record. Opening
+Audible restores its loaded book paused, and that is enough to seed an empty list.
+
+`adb shell input keyevent 126/127` plays and pauses the active session. The
+session event log attributes the key to whatever app is in the foreground, not
+to adb.
 
 ## Manual checks that matter
 
@@ -185,6 +217,31 @@ Release build with the Dragon Ball, Sailor Moon and Spy × Family skins.
 | Spy × Family on the watch | **not verified on device** — scripted runs kept falling out of the app (`docs/LESSONS.md` #23). Covered by `WallpaperContrastTest` and the review crops only |
 
 Switch skins by hand under **Settings > SKIN**; there is no deep link for it.
+
+## Verified on device — media screen and phone companion, 2026-09-10
+
+Release 0.3.0 on the watch and the phone (same signing certificate,
+SHA-256 `0907add2…4a48d6`), Audible 26.34.07 on the phone.
+
+| Check | Result |
+|---|---|
+| Media screen appended as the 6th page, Spotify and Phone icons read from the apps | pass |
+| Empty list seeded with the book loaded in Audible (paused) | pass — *Mimic & Me, 5h 19m left* on phone and watch |
+| Tap a book that isn't loaded | pass — watch shows *starting on phone…*; Audible switched to it in ~11 s |
+| Tap the book already loaded | pass after a fix — a search for it put Audible in ERROR; now a plain play, PLAYING in 3 s |
+| Spotify shortcut | pass — `com.spotify.music/com.spotify.wear.main.MainActivity` |
+| Phone shortcut | pass — `com.samsung.android.mediacontroller/…SelectDeviceActivity` |
+| A book counted after a minute of listening updates the watch live | pass, 2026-09-11 — *Galaxy Outlaws* went on top of the watch's list while the user listened |
+| …and the phone's own screen | **fail, then fixed, not yet re-verified** — the phone got no event for its own write (`docs/LESSONS.md` #33) |
+| A book recorded while Audible reported no length | lost its "time left"; a gap now keeps the known value (`RecentAudiobooksTest`) |
+| **Capture** button on the phone | installed 2026-09-11, **not verified on device** — the phone was in use; covered by `ListeningTrackerUseCaseTest` |
+| Audible not running when a book is tapped (media-button wake-up) | **not verified on device** |
+| Media screen over a themed skin | **not verified on device** — borrows the workouts wallpaper; `WallpaperContrastTest` passes |
+
+The switch that landed on PAUSED rather than PLAYING was not ours. Audible
+took audio focus and lost it 0.2 s later to a transient request from another
+app, and Audible pauses on a duck because it plays speech (`dumpsys audio`
+focus history).
 
 ## Verified on device — late alarm, back button, Rest + Sets, 2026-09-10
 

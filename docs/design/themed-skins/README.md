@@ -130,7 +130,8 @@ margin and, on most, a painted dark bezel ring. That frame is expected —
 
    The confirm dialog never has a wallpaper. The Rest + Sets screen always
    borrows `rest.png`: `SkinArt` can take a picture of its own, but the script
-   has no `rest-and-counter` slot yet.
+   has no `rest-and-counter` slot yet. The media screen borrows `workouts.png`
+   the same way (`SkinArt(media = …)`, no `media` slot in the script).
 
 2. Run `powershell -File scripts/wallpapers.ps1`. It finds the art circle, crops
    to it and writes 480×480 JPEGs to

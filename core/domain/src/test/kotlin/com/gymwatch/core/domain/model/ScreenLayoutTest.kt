@@ -56,6 +56,7 @@ class ScreenLayoutTest {
                 AppScreen.COUNTER,
                 AppScreen.WORKOUTS,
                 AppScreen.REST_AND_COUNTER,
+                AppScreen.MEDIA,
             ),
             moved.order,
         )
@@ -64,7 +65,7 @@ class ScreenLayoutTest {
     @Test
     fun `move off either end is a no-op`() {
         assertEquals(ScreenLayout.DEFAULT, ScreenLayout.DEFAULT.move(AppScreen.CHRONOMETER, -1))
-        assertEquals(ScreenLayout.DEFAULT, ScreenLayout.DEFAULT.move(AppScreen.WORKOUTS, 1))
+        assertEquals(ScreenLayout.DEFAULT, ScreenLayout.DEFAULT.move(AppScreen.MEDIA, 1))
     }
 
     @Test
@@ -86,7 +87,7 @@ class ScreenLayoutTest {
         )
         val upgraded = ScreenLayout.of(stored, hidden = setOf(AppScreen.CHRONOMETER))
 
-        assertEquals(stored + AppScreen.REST_AND_COUNTER, upgraded.order)
+        assertEquals(stored + AppScreen.REST_AND_COUNTER + AppScreen.MEDIA, upgraded.order)
         assertTrue(upgraded.isVisible(AppScreen.REST_AND_COUNTER))
     }
 

@@ -14,8 +14,8 @@ android {
         applicationId = "com.gymwatch"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
     }
 
     /**
@@ -68,6 +68,7 @@ dependencies {
     implementation(project(":core:application"))
     implementation(project(":adapters:driven:platform"))
     implementation(project(":adapters:driven:persistence"))
+    implementation(project(":adapters:driven:wearsync"))
     implementation(project(":adapters:driving:ui-compose"))
     implementation(project(":adapters:driving:service"))
 

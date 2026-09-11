@@ -25,6 +25,9 @@ internal enum class WallpaperSlot(val textRadius: Float) {
 
     // The outer shortcuts' names reach most of the way to the rim.
     WORKOUTS(1f),
+
+    // Book rows run nearly rim to rim.
+    MEDIA(1f),
     SETTINGS(1f),
     REST_EDITOR(1f),
     WORKOUT_PICKER(1f),
@@ -33,7 +36,7 @@ internal enum class WallpaperSlot(val textRadius: Float) {
 /**
  * One themed skin's pictures.
  *
- * Six surfaces must have their own. The other four borrow their parent's until
+ * Six surfaces must have their own. The other five borrow their parent's until
  * a picture is drawn for them, which is why they are nullable: adding one later
  * is a resource from `scripts/wallpapers.ps1` and one argument here.
  */
@@ -48,6 +51,7 @@ internal class SkinArt(
     private val restAndCounter: Int? = null,
     private val restEditor: Int? = null,
     private val workoutPicker: Int? = null,
+    private val media: Int? = null,
 ) {
     @DrawableRes
     fun forSlot(slot: WallpaperSlot): Int = when (slot) {
@@ -61,6 +65,7 @@ internal class SkinArt(
         WallpaperSlot.SETTINGS -> settings
         WallpaperSlot.REST_EDITOR -> restEditor ?: rest
         WallpaperSlot.WORKOUT_PICKER -> workoutPicker ?: workouts
+        WallpaperSlot.MEDIA -> media ?: workouts
     }
 }
 

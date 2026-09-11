@@ -2,6 +2,9 @@ package com.gymwatch.core.domain.port
 
 import com.gymwatch.core.domain.model.ExerciseKind
 import com.gymwatch.core.domain.model.Haptic
+import com.gymwatch.core.domain.model.MediaApp
+import com.gymwatch.core.domain.model.NowPlaying
+import com.gymwatch.core.domain.model.PlayOutcome
 import kotlin.time.Duration
 
 fun interface HapticsPort {
@@ -63,4 +66,30 @@ interface CompanionHealthAppPort {
      * to [open].
      */
     suspend fun startWorkout(kind: ExerciseKind): Boolean
+}
+
+/**
+ * Starts an audiobook on the phone, by title.
+ *
+ * On the watch this is a request carried to the phone; on the phone it is the
+ * command to the audiobook player itself. A title is all there is to go on:
+ * Audible accepts a search on its playback session from another app, but will
+ * not let one browse its library (docs/LESSONS.md #32).
+ */
+fun interface AudiobookPlayerPort {
+    suspend fun play(title: String): PlayOutcome
+}
+
+/** What the phone's audiobook player has loaded right now, playing or paused. */
+fun interface NowPlayingPort {
+    /** Null when nothing is loaded, the player isn't running, or the app can't see it. */
+    suspend fun current(): NowPlaying?
+}
+
+/** Other apps on the watch. Which packages they are is the adapter's business. */
+interface MediaAppsPort {
+    suspend fun isInstalled(app: MediaApp): Boolean
+
+    /** Returns false if the app is missing or refused to open. */
+    suspend fun open(app: MediaApp): Boolean
 }

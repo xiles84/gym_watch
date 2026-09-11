@@ -3,13 +3,21 @@ package com.gymwatch.core.application.fake
 import com.gymwatch.core.domain.model.Counter
 import com.gymwatch.core.domain.model.ExerciseKind
 import com.gymwatch.core.domain.model.Haptic
+import com.gymwatch.core.domain.model.MediaApp
+import com.gymwatch.core.domain.model.NowPlaying
+import com.gymwatch.core.domain.model.PlayOutcome
+import com.gymwatch.core.domain.model.RecentAudiobooks
 import com.gymwatch.core.domain.model.ScreenLayout
 import com.gymwatch.core.domain.model.Skin
 import com.gymwatch.core.domain.model.WorkoutSetup
+import com.gymwatch.core.domain.port.AudiobookPlayerPort
 import com.gymwatch.core.domain.port.ClockPort
 import com.gymwatch.core.domain.port.CompanionHealthAppPort
 import com.gymwatch.core.domain.port.CounterRepositoryPort
 import com.gymwatch.core.domain.port.HapticsPort
+import com.gymwatch.core.domain.port.MediaAppsPort
+import com.gymwatch.core.domain.port.NowPlayingPort
+import com.gymwatch.core.domain.port.RecentAudiobooksRepositoryPort
 import com.gymwatch.core.domain.port.ScreenLayoutRepositoryPort
 import com.gymwatch.core.domain.port.SkinRepositoryPort
 import com.gymwatch.core.domain.port.WakeUpPort
@@ -133,6 +141,44 @@ class FakeHealthApp(
         if (!available) return false
         started += kind
         return startSucceeds
+    }
+}
+
+class InMemoryRecentAudiobooksRepository(
+    initial: RecentAudiobooks = RecentAudiobooks.EMPTY,
+) : RecentAudiobooksRepositoryPort {
+    private val flow = MutableStateFlow(initial)
+    override val recent: StateFlow<RecentAudiobooks> = flow.asStateFlow()
+    val current: RecentAudiobooks get() = flow.value
+    var saved: RecentAudiobooks? = null
+        private set
+    override suspend fun save(recent: RecentAudiobooks) {
+        saved = recent
+        flow.value = recent
+    }
+}
+
+/** Answers every request with [outcome] and remembers the titles asked for. */
+class FakeAudiobookPlayer(private val outcome: PlayOutcome = PlayOutcome.STARTING) : AudiobookPlayerPort {
+    val requested = mutableListOf<String>()
+    override suspend fun play(title: String): PlayOutcome {
+        requested += title
+        return outcome
+    }
+}
+
+/** The player's loaded book, set by the test. */
+class FakeNowPlaying(var loaded: NowPlaying? = null) : NowPlayingPort {
+    override suspend fun current(): NowPlaying? = loaded
+}
+
+class FakeMediaApps(private val installed: Set<MediaApp>) : MediaAppsPort {
+    val opened = mutableListOf<MediaApp>()
+    override suspend fun isInstalled(app: MediaApp): Boolean = app in installed
+    override suspend fun open(app: MediaApp): Boolean {
+        if (app !in installed) return false
+        opened += app
+        return true
     }
 }
 

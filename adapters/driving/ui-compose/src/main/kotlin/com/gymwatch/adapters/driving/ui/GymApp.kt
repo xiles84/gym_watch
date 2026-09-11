@@ -21,8 +21,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.gymwatch.core.application.AudiobooksUseCase
 import com.gymwatch.core.application.ChronometerUseCase
 import com.gymwatch.core.application.CounterUseCase
+import com.gymwatch.core.application.MediaShortcutsUseCase
 import com.gymwatch.core.application.RestTimerUseCase
 import com.gymwatch.core.application.ScreenLayoutUseCase
 import com.gymwatch.core.application.SkinUseCase
@@ -51,6 +53,9 @@ fun GymApp(
     counter: CounterUseCase,
     workouts: WorkoutSetupUseCase,
     workoutIcons: WorkoutIcons,
+    audiobooks: AudiobooksUseCase,
+    mediaShortcuts: MediaShortcutsUseCase,
+    mediaIcons: MediaIcons,
     screenLayout: ScreenLayoutUseCase,
     skins: SkinUseCase,
     requestedScreen: AppScreen? = null,
@@ -151,6 +156,12 @@ fun GymApp(
                                     onChangeShortcut = { editing = Editor.Shortcut(it) },
                                 )
 
+                                AppScreen.MEDIA -> MediaScreen(
+                                    audiobooks = audiobooks,
+                                    shortcuts = mediaShortcuts,
+                                    icons = mediaIcons,
+                                )
+
                                 // Past the last visible screen: the settings page.
                                 null -> SettingsScreen(screenLayout, skins)
                             }
@@ -196,5 +207,6 @@ private fun wallpaperSlotOf(screen: AppScreen?): WallpaperSlot = when (screen) {
     AppScreen.COUNTER -> WallpaperSlot.COUNTER
     AppScreen.REST_AND_COUNTER -> WallpaperSlot.REST_AND_COUNTER
     AppScreen.WORKOUTS -> WallpaperSlot.WORKOUTS
+    AppScreen.MEDIA -> WallpaperSlot.MEDIA
     null -> WallpaperSlot.SETTINGS
 }
